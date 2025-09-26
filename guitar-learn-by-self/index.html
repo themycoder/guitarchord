@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + React</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+  (function () {
+    const p = new URLSearchParams(window.location.search);
+    const t = p.get('token');
+    const r = p.get('refresh');
+    if (t && r) {
+      localStorage.setItem('auth_tokens_v1', JSON.stringify({ accessToken: t, refreshToken: r }));
+      history.replaceState({}, '', window.location.pathname); // xóa query
+    }
+  })();
+   </script>
+
+  </body>
+</html>
