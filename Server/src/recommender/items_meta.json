@@ -1,0 +1,31 @@
+{
+  "L001": {
+    "title": "Open Chords 1",
+    "topic": "chord",
+    "level": 0,
+    "prereqs": [],
+    "tags": ["chord", "open", "beginner", "rhythm-basic"],
+    "quiz_pool": [
+      { "id": "Q-L001-1", "difficulty": 1, "tags": ["chord", "open"] },
+      { "id": "Q-L001-2", "difficulty": 1, "tags": ["rhythm-basic"] }
+    ]
+  },
+  "L010": {
+    "title": "Power Chords",
+    "topic": "technique",
+    "level": 1,
+    "prereqs": ["L001"],
+    "tags": ["power", "rock", "mute", "beginner+"],
+    "quiz_pool": [
+      { "id": "Q-L010-1", "difficulty": 2, "tags": ["power", "mute"] }
+    ]
+  },
+  "L020": {
+    "title": "Barre Chords E-shape",
+    "topic": "chord",
+    "level": 2,
+    "prereqs": ["L010"],
+    "tags": ["barre", "technique", "strength", "intermediate"],
+    "quiz_pool": [{ "id": "Q-L020-1", "difficulty": 2, "tags": ["barre"] }]
+  }
+}

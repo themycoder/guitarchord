@@ -10,6 +10,10 @@ import ListGuitarNotes from "./pages/GuitarNotes/ListGuitarNotes";
 import CreateGuitarNote from "./pages/GuitarNotes/CreateGuitarNote";
 import EditGuitarNote from "./pages/GuitarNotes/EditGuitarNote";
 import Theory from "./pages/Theory";
+import Information from "./pages/Information";
+import AddQuiz from "./pages/AddQuizz";
+import Lesson from "./pages/LessonsAdmin";
+import QuizAdmin from "./pages/QuizAdmin";
 
 function App() {
   return (
@@ -22,6 +26,7 @@ function App() {
         <Route path="/admin/tunings/create" element={<CreateTuning />} />
         <Route path="/admin/tunings/edit/:id" element={<EditTuning />} />
         <Route path="/admin/guitar-notes" element={<ListGuitarNotes />} />
+
         <Route
           path="/admin/guitar-notes/create"
           element={<CreateGuitarNote />}
@@ -30,7 +35,12 @@ function App() {
           path="/admin/guitar-notes/edit/:id"
           element={<EditGuitarNote />}
         />
+        <Route path="/admin/add-information" element={<Information />} />
+        <Route path="/admin/add-quizz" element={<AddQuiz />} />
+        <Route path="/admin/add-quiz" element={<QuizAdmin/>} />
+
         <Route path="/admin/add-theory" element={<Theory />} />
+        <Route path="/admin/add-lesson" element={<Lesson />} />
       </Route>
     </Routes>
   );

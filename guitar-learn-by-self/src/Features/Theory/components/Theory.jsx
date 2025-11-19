@@ -305,18 +305,18 @@ function ArticleList({ articles = [], onPick }) {
   return (
     <div className="sticky top-28 space-y-4">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        Bài theory khác
+        Bài Lý thuyết khác
       </div>
       <div className="space-y-3">
         {articles.map((a) => (
           <a
             key={a._id || a.id || a.slug}
-            href={`/theory/${a.slug}`}
+            href={`/information/${a.slug}`}
             onClick={(e) => {
               e.preventDefault();
               onPick && onPick(a.slug);
               if (typeof window !== "undefined") {
-                window.history.pushState({}, "", `/theory/${a.slug}`);
+                window.history.pushState({}, "", `/information/${a.slug}`);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }
             }}
@@ -529,7 +529,7 @@ export default function TheoryPage({ idOrSlug, blocks = [], showList = true }) {
       try {
         if (activeSlug) {
           const res = await fetch(
-            `${API_BASE}/theory/${encodeURIComponent(activeSlug)}`
+            `${API_BASE}/information/${encodeURIComponent(activeSlug)}`
           );
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const json = await res.json();
@@ -538,7 +538,7 @@ export default function TheoryPage({ idOrSlug, blocks = [], showList = true }) {
           setDisplayBlocks(json.data?.blocks || []);
         } else {
           const res = await fetch(
-            `${API_BASE}/theory?status=published&limit=1&sort=newest`
+            `${API_BASE}/information?status=published&limit=1&sort=newest`
           );
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const json = await res.json();
@@ -565,7 +565,7 @@ export default function TheoryPage({ idOrSlug, blocks = [], showList = true }) {
     async function loadList() {
       try {
         const res = await fetch(
-          `${API_BASE}/theory?status=published&limit=20&sort=newest`
+          `${API_BASE}/information?status=published&limit=20&sort=newest`
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -599,7 +599,7 @@ export default function TheoryPage({ idOrSlug, blocks = [], showList = true }) {
     if (!slug) return;
     setActiveSlug(slug);
     if (typeof window !== "undefined") {
-      window.history.pushState({}, "", `/theory/${slug}`);
+      window.history.pushState({}, "", `/information/${slug}`);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -625,10 +625,8 @@ export default function TheoryPage({ idOrSlug, blocks = [], showList = true }) {
             <span className="inline-flex items-center gap-1 rounded-full bg-white/80 dark:bg-slate-900/70 px-2 py-0.5 ring-1 ring-slate-200 dark:ring-slate-700">
               <span>🎸</span> Guitar Theory
             </span>
-            <span>•</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/80 dark:bg-slate-900/70 px-2 py-0.5 ring-1 ring-slate-200 dark:ring-slate-700">
-              Block-driven
-            </span>
+            
+         
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
             {article?.title || "Guitar Theory"}
@@ -764,7 +762,7 @@ export default function TheoryPage({ idOrSlug, blocks = [], showList = true }) {
                 onPick={(slug) => {
                   setActiveSlug(slug);
                   if (typeof window !== "undefined") {
-                    window.history.pushState({}, "", `/theory/${slug}`);
+                    window.history.pushState({}, "", `/information/${slug}`);
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }
                 }}

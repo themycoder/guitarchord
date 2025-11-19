@@ -1,0 +1,7 @@
+{
+  "factors": 64,
+  "iterations": 20,
+  "regularization": 0.01,
+  "users": 1,
+  "items": 5
+}

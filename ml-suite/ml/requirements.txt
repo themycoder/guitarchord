@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+numpy
+pandas
+scikit-learn
+lightfm
+implicit
+torch
+torchaudio
+librosa
+faiss-cpu

@@ -1,46 +1,78 @@
-// auth.controller.ts
+// controllers/auth.controller.ts
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import passport from "passport";
-import { authConfig } from "../config/auth.config";
-import { hashPassword, comparePassword } from "../utils/password.util";
 import { User } from "../models/User";
+import { Session } from "../models/Session";
+import { hashPassword, comparePassword } from "../utils/password.util";
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyToken,
+} from "../utils/jwt.util";
 
-const refreshTokens: string[] = [];
-const backListTokens: string[] = [];
+const REFRESH_TTL_DAYS = 30;
 
-// Đăng ký tài khoản thường
+function buildJWTSubject(user: any) {
+  return {
+    sub: String(user._id),
+    role: user.role,
+    displayName:
+      user.displayName ||
+      user.username ||
+      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+      user.email,
+  };
+}
+
+/* ----------------- Local Register ----------------- */
 export const register = async (req: Request, res: Response) => {
   const { username, email, password, role, age } = req.body;
 
   if (!username || !email || !password) {
-    res.status(400).json({ message: "Vui lòng nhập đủ thông tin" });
+    res.status(400).json({ message: "Thiếu thông tin" });
     return;
   }
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    res.status(409).json({ message: "Email đã tồn tại" });
-    return;
-  }
-
-  const hashedPassword = await hashPassword(password);
-  const newUser = new User({
-    username,
-    email,
-    password: hashedPassword,
-    role,
-    age,
+  const existed = await User.findOne({
+    $or: [{ email: String(email).toLowerCase() }, { username }],
   });
-  await newUser.save();
+  if (existed) {
+    res.status(409).json({ message: "Email/Username đã tồn tại" });
+    return;
+  }
+
+  const hashed = await hashPassword(password);
+  const user = await User.create({
+    username,
+    email: String(email).toLowerCase(),
+    password: hashed,
+    role: role || "user",
+    age,
+    profile: { level: "beginner", skills: [], goals: [] },
+  });
+
+  const payload = buildJWTSubject(user);
+  const accessToken = signAccessToken(payload);
+  const refreshToken = signRefreshToken(payload);
+
+  await Session.create({
+    userId: String(user._id),
+    refreshToken,
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+    expiresAt: new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 3600 * 1000),
+  });
 
   res.json({
     message: "Đăng ký thành công",
-    user: { username, email, role, age },
+    accessToken,
+    refreshToken,
+    user: payload,
   });
+  return;
 };
 
-// Đăng nhập tài khoản thường
+/* ----------------- Local Login ----------------- */
 export const login = async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -49,11 +81,10 @@ export const login = async (req: Request, res: Response) => {
     res.status(404).json({ message: "Không tìm thấy user" });
     return;
   }
-
   if (!user.password) {
     res
       .status(400)
-      .json({ message: "Tài khoản này không hỗ trợ đăng nhập bằng mật khẩu" });
+      .json({ message: "Tài khoản này chỉ hỗ trợ đăng nhập Google" });
     return;
   }
 
@@ -62,91 +93,107 @@ export const login = async (req: Request, res: Response) => {
     res.status(401).json({ message: "Sai mật khẩu" });
     return;
   }
-const displayName =
-  user.username ||
-  [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-  user.email;
 
-  const payload = { username: user.username, role: user.role, age: user.age };
-  const token = jwt.sign(payload, authConfig.secretKey, { expiresIn: "1h" });
-  const refreshToken = jwt.sign(payload, authConfig.secretKey);
+  user.lastLoginAt = new Date();
+  await user.save();
 
-  refreshTokens.push(refreshToken);
-  res.json({ message: "Đăng nhập thành công", token, refreshToken });
+  const payload = buildJWTSubject(user);
+  const accessToken = signAccessToken(payload);
+  const refreshToken = signRefreshToken(payload);
+
+  await Session.create({
+    userId: String(user._id),
+    refreshToken,
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+    expiresAt: new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 3600 * 1000),
+  });
+
+  res.json({
+    message: "Đăng nhập thành công",
+    accessToken,
+    refreshToken,
+    user: payload,
+  });
+  return;
 };
 
-// Refresh token
-export const refreshTokenHandler = (req: Request, res: Response) => {
+/* ----------------- Refresh Token ----------------- */
+export const refreshTokenHandler = async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
 
-  if (!refreshToken || !refreshTokens.includes(refreshToken)) {
-    res.status(403).json({ message: "Refresh token không hợp lệ" });
+  if (!refreshToken) {
+    res.status(403).json({ message: "Thiếu refresh token" });
     return;
   }
 
-  jwt.verify(
-    refreshToken,
-    authConfig.secretKey,
-    (error: jwt.VerifyErrors | null, payload: any) => {
-      if (error) {
-        res.status(403).json({ message: "Refresh token không hợp lệ", error });
-        return;
-      }
+  const session = await Session.findOne({ refreshToken });
+  if (!session || session.expiresAt < new Date()) {
+    res.status(403).json({ message: "Refresh token không hợp lệ/hết hạn" });
+    return;
+  }
 
-      const token = jwt.sign(payload as object, authConfig.secretKey, {
-        expiresIn: "1h",
-      });
-      res.json({ token });
-    }
-  );
+  try {
+    const payload: any = verifyToken(refreshToken);
+
+    const newAccess = signAccessToken({
+      sub: payload.sub,
+      role: payload.role,
+      displayName: payload.displayName,
+    });
+    const newRefresh = signRefreshToken({
+      sub: payload.sub,
+      role: payload.role,
+      displayName: payload.displayName,
+    });
+
+    session.refreshToken = newRefresh;
+    session.expiresAt = new Date(
+      Date.now() + REFRESH_TTL_DAYS * 24 * 3600 * 1000
+    );
+    await session.save();
+
+    res.json({ accessToken: newAccess, refreshToken: newRefresh });
+    return;
+  } catch {
+    res.status(403).json({ message: "Refresh token không hợp lệ" });
+    return;
+  }
 };
 
-// Đăng xuất
-export const logout = (req: any, res: Response) => {
+/* ----------------- Logout ----------------- */
+export const logout = async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
-  let message = "Đăng xuất không thành công";
-
-  const index = refreshTokens.indexOf(refreshToken);
-  if (index !== -1) {
-    refreshTokens.splice(index, 1);
-    backListTokens.push(req.token);
-    message = "Đăng xuất thành công";
-  }
-
-  res.json({ message });
+  await Session.deleteOne({ refreshToken });
+  res.json({ message: "Đăng xuất thành công" });
+  return;
 };
 
-// Route cần xác thực
-export const protectedRoute = (req: any, res: any) => {
-  if (backListTokens.includes(req.token)) {
-    return res.status(401).json({ message: "Token is blacklisted" });
-  }
-
-  res.json({ message: "Access granted to protected route" });
+/* ----------------- Protected / Admin / User routes ----------------- */
+export const protectedRoute = (req: any, res: Response) => {
+  // có thể bổ sung check blacklist nếu em dùng blackList khác
+  res.json({ message: "Access granted to protected route", user: req.user });
+  return;
 };
 
-// Route cho admin
-export const adminRoute = (req: any, res: any) => {
-  res.json({ message: "Đây là api dành cho admin", user: req?.user });
+export const adminRoute = (req: any, res: Response) => {
+  res.json({ message: "Đây là api dành cho admin", user: req.user });
+  return;
 };
 
-// Route cho user
-export const userRoute = (req: any, res: any) => {
-  res.json({ message: "Đây là api dành cho user", user: req?.user });
+export const userRoute = (req: any, res: Response) => {
+  res.json({ message: "Đây là api dành cho user", user: req.user });
+  return;
 };
 
-// --------------------- Google OAuth ----------------------
-
-// Bắt đầu quá trình đăng nhập Google
+/* ----------------- Google OAuth ----------------- */
 export const googleAuth = (req: Request, res: Response, next: NextFunction) => {
-  passport.authenticate("google", { scope: ["profile", "email"] })(
-    req,
-    res,
-    next
-  );
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    session: false,
+  })(req, res, next);
 };
 
-// Xử lý callback từ Google
 export const googleCallback = (
   req: Request,
   res: Response,
@@ -154,65 +201,37 @@ export const googleCallback = (
 ) => {
   passport.authenticate(
     "google",
-    { failureRedirect: "/" },
-    async (err: any, profileUser: any) => {
-      if (err) {
-        return res
-          .status(500)
-          .json({ message: "Xác thực Google thất bại", error: err });
+    { session: false },
+    async (err: any, user: any) => {
+      if (err || !user) {
+        res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
+        return;
       }
 
-      if (!profileUser) {
-        return res
-          .status(404)
-          .json({ message: "Không tìm thấy người dùng Google" });
-      }
+      const payload = {
+        sub: String(user._id),
+        role: user.role,
+        displayName: user.displayName || user.email,
+      };
 
-      try {
-        // Kiểm tra xem người dùng đã tồn tại chưa
-        let user = await User.findOne({ googleId: profileUser.googleId });
+      const accessToken = signAccessToken(payload);
+      const refreshToken = signRefreshToken(payload);
 
-        // Nếu chưa có thì tạo mới
-        if (!user) {
-          user = new User({
-            googleId: profileUser.googleId,
-            email: profileUser.email,
-            firstName: profileUser.firstName,
-            lastName: profileUser.lastName,
-            role: "user",
-            age: 18, // default
-          });
-          await user.save();
-        }
-const displayName =
-  user.username ||
-  [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-  user.email;
+      await Session.create({
+        userId: String(user._id),
+        refreshToken,
+        userAgent: req.headers["user-agent"],
+        ip: req.ip,
+        expiresAt: new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 3600 * 1000),
+      });
 
-        const payload = {
-          username: user.username,
-          role: user.role,
-          age: user.age,
-        };
-        const token = jwt.sign(payload, authConfig.secretKey, {
-          expiresIn: "1h",
-        });
-        const refreshToken = jwt.sign(payload, authConfig.secretKey);
-
-        refreshTokens.push(refreshToken);
-
-        const redirectUrl = `${
-          process.env.FRONTEND_URL
-        }/?token=${encodeURIComponent(token)}&refresh=${encodeURIComponent(
-          refreshToken
-        )}`;
-        return res.redirect(302, redirectUrl);
-      } catch (e) {
-        return res
-          .status(500)
-          .json({ message: "Lỗi xử lý user Google", error: e });
-      }
+      const redirectUrl = `${
+        process.env.FRONTEND_URL
+      }/oauth/callback?token=${encodeURIComponent(
+        accessToken
+      )}&refresh=${encodeURIComponent(refreshToken)}`;
+      res.redirect(302, redirectUrl);
+      return;
     }
   )(req, res, next);
 };
-

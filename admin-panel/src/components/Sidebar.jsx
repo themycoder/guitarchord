@@ -44,6 +44,30 @@ const Sidebar = () => {
           </li>
           <li>
             <NavLink
+              to="/admin/add-information"
+              className={({ isActive }) =>
+                `block p-2 rounded ${
+                  isActive ? "bg-blue-600" : "hover:bg-gray-700"
+                }`
+              }
+            >
+              Thêm information
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/admin/add-quiz"
+              className={({ isActive }) =>
+                `block p-2 rounded ${
+                  isActive ? "bg-blue-600" : "hover:bg-gray-700"
+                }`
+              }
+            >
+              Thêm Quiz
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
               to="/admin/add-theory"
               className={({ isActive }) =>
                 `block p-2 rounded ${
@@ -51,7 +75,31 @@ const Sidebar = () => {
                 }`
               }
             >
-              Thêm theory
+              Thêm Theory
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/admin/add-lesson"
+              className={({ isActive }) =>
+                `block p-2 rounded ${
+                  isActive ? "bg-blue-600" : "hover:bg-gray-700"
+                }`
+              }
+            >
+              Thêm lesson
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/admin/add-quiz"
+              className={({ isActive }) =>
+                `block p-2 rounded ${
+                  isActive ? "bg-blue-600" : "hover:bg-gray-700"
+                }`
+              }
+            >
+              Thêm quiz
             </NavLink>
           </li>
           {/* <li>

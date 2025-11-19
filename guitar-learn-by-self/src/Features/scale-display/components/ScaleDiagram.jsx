@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 /**
- * ScaleDiagram – Complete polished version
+ * ScaleDiagram – UI đồng bộ palette xanh
  * - String numbers (both sides)
- * - Left/Right‑handed toggle with proper text counter‑flip
+ * - Left/Right-handed toggle with proper text counter-flip
  * - Pastel note colors, smaller markers, fret markers 3/5/7/9/12
- * - Dark‑mode friendly
+ * - Dark-mode friendly + màu giống Navbar / ProgressionMatrix
  */
 
 const NOTE_COLORS = {
@@ -158,10 +158,10 @@ export default function ScaleDiagram() {
               key={b.box}
               onClick={() => setSelectedBox(b.box)}
               className={[
-                "px-3 py-1.5 rounded-full text-sm border",
+                "px-3 py-1.5 rounded-full text-sm border transition-colors",
                 selectedBox === b.box
-                  ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 border-transparent shadow"
-                  : "bg-white/60 dark:bg-gray-900/50 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
+                  ? "bg-[#334EAC] text-white border-[#061F5C] shadow-sm"
+                  : "bg-white/80 text-[#061F5C] border-[#D0E3FF] hover:bg-[#E7F1FF] dark:bg-[#020617] dark:text-[#F9FCFF] dark:border-[#334EAC] dark:hover:bg-[#061F5C]/70",
               ].join(" ")}
             >
               Box {b.box}
@@ -182,10 +182,10 @@ export default function ScaleDiagram() {
               className="inline-block w-4 h-4 rounded-full ring-1 ring-black/10 dark:ring-white/10"
               style={{ background: NOTE_COLORS[n] || "#4CAF50" }}
             />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
+            <span className="text-sm text-slate-800 dark:text-slate-200">
               <span className="font-medium">{n}</span>
               {degreeMap[n] ? (
-                <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">
                   ({degreeMap[n]})
                 </span>
               ) : null}
@@ -197,16 +197,16 @@ export default function ScaleDiagram() {
   };
 
   const ToggleGroup = () => (
-    <div className="inline-flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="inline-flex rounded-xl border border-[#D0E3FF] dark:border-[#334EAC] overflow-hidden bg-white/80 dark:bg-[#020617]">
       {[LabelMode.NOTE, LabelMode.DEGREE, LabelMode.BOTH].map((m) => (
         <button
           key={m}
           onClick={() => setLabelMode(m)}
           className={[
-            "px-3 py-1.5 text-sm",
+            "px-3 py-1.5 text-sm transition-colors",
             labelMode === m
-              ? "bg-gray-900 text-white dark:bg.white dark:text-gray-900"
-              : "bg-white/60 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800",
+              ? "bg-[#334EAC] text-white"
+              : "bg-transparent text-[#061F5C] hover:bg-[#E7F1FF] dark:text-[#F9FCFF] dark:hover:bg-[#061F5C]/70",
           ].join(" ")}
         >
           {m === LabelMode.NOTE
@@ -221,19 +221,19 @@ export default function ScaleDiagram() {
 
   const Controls = () => (
     <div className="sticky top-4 space-y-5">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+      <h2 className="text-2xl font-bold text-[#061F5C] dark:text-[#F9FCFF]">
         Scale Diagram
       </h2>
 
       <div className="grid grid-cols-1 gap-4">
         {/* Root */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Root Note
           </label>
           <div className="relative">
             <select
-              className="w-full appearance-none px-3 py-2.5 rounded-xl border bg-white/80 dark:bg-gray-900/60 backdrop-blur border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full appearance-none px-3 py-2.5 rounded-xl border bg-white/90 text-[#061F5C] backdrop-blur border-[#D0E3FF] dark:bg-[#020617] dark:text-[#F9FCFF] dark:border-[#334EAC] focus:outline-none focus:ring-2 focus:ring-[#334EAC]"
               value={selectedRootNote}
               onChange={(e) => setSelectedRootNote(e.target.value)}
             >
@@ -243,18 +243,18 @@ export default function ScaleDiagram() {
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-gray-500" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-slate-500" />
           </div>
         </div>
 
         {/* Type */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
             Scale Type
           </label>
           <div className="relative">
             <select
-              className="w-full appearance-none px-3 py-2.5 rounded-xl border bg-white/80 dark:bg-gray-900/60 backdrop-blur border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full appearance-none px-3 py-2.5 rounded-xl border bg-white/90 text-[#061F5C] backdrop-blur border-[#D0E3FF] dark:bg-[#020617] dark:text-[#F9FCFF] dark:border-[#334EAC] focus:outline-none focus:ring-2 focus:ring-[#334EAC]"
               value={selectedScaleType}
               onChange={(e) => setSelectedScaleType(e.target.value)}
               disabled={!scaleTypes.length}
@@ -266,13 +266,13 @@ export default function ScaleDiagram() {
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-gray-500" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-slate-500" />
           </div>
         </div>
 
         {/* Label mode */}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Labels
           </span>
           <ToggleGroup />
@@ -280,22 +280,22 @@ export default function ScaleDiagram() {
 
         {/* Handedness */}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Tay chơi
           </span>
           <button
             onClick={() => setLeftHanded((v) => !v)}
             className={[
-              "px-3 py-1.5 rounded-xl text-sm border",
+              "px-3 py-1.5 rounded-xl text-sm border transition-colors",
               leftHanded
-                ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 border-transparent shadow"
-                : "bg-white/60 dark:bg-gray-900/50 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800",
+                ? "bg-[#334EAC] text-white border-[#061F5C] shadow-sm"
+                : "bg-white/80 text-[#061F5C] border-[#D0E3FF] hover:bg-[#E7F1FF] dark:bg-[#020617] dark:text-[#F9FCFF] dark:border-[#334EAC] dark:hover:bg-[#061F5C]/70",
             ].join(" ")}
             title={
               leftHanded ? "Đang ở chế độ tay trái" : "Đang ở chế độ tay phải"
             }
           >
-            {leftHanded ? "Left‑handed" : "Right‑handed"}
+            {leftHanded ? "Left-handed" : "Right-handed"}
           </button>
         </div>
 
@@ -304,15 +304,15 @@ export default function ScaleDiagram() {
 
         {/* Meta card */}
         {currentScale && (
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-blue-50/60 dark:bg-blue-950/30 p-4">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+          <div className="rounded-2xl border border-[#D0E3FF] dark:border-[#334EAC] bg-[#E7F1FF]/70 dark:bg-[#061F5C]/70 p-4">
+            <h3 className="font-semibold text-[#061F5C] dark:text-[#F9FCFF]">
               {currentScale.scale}
             </h3>
-            <p className="text-sm mt-1 text-gray-700 dark:text-gray-300">
+            <p className="text-sm mt-1 text-slate-800 dark:text-slate-200">
               <span className="font-medium">Notes:</span>{" "}
               {currentScale.notes?.join(", ")}
             </p>
-            <p className="text-sm mt-1 text-gray-700 dark:text-gray-300">
+            <p className="text-sm mt-1 text-slate-800 dark:text-slate-200">
               <span className="font-medium">Degrees:</span>{" "}
               {currentScale.degrees?.join(", ")}
             </p>
@@ -322,7 +322,7 @@ export default function ScaleDiagram() {
 
         {/* Error */}
         {error && (
-          <div className="rounded-xl border-l-4 border-red-500 bg-red-50 dark:bg-red-950/30 p-3 text-red-700 dark:text-red-200 text-sm">
+          <div className="rounded-xl border-l-4 border-rose-500 bg-rose-50 dark:bg-rose-950/30 p-3 text-rose-700 dark:text-rose-200 text-sm">
             {error}
           </div>
         )}
@@ -331,19 +331,19 @@ export default function ScaleDiagram() {
   );
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
+    <div className="min-h-screen w-full bg-gradient-to-br from-[#D0E3FF]/40 via-[#E7F1FF]/60 to-[#F9FCFF] dark:from-[#020617] dark:via-[#020617] dark:to-[#020617]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Controls */}
           <div className="lg:col-span-1">
-            <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/60 backdrop-blur p-5 shadow-sm">
+            <div className="rounded-3xl border border-[#D0E3FF] dark:border-[#1f2937] bg-white/80 dark:bg-[#020617]/90 backdrop-blur p-5 shadow-sm">
               {loading ? <SidebarSkeleton /> : <Controls />}
             </div>
           </div>
 
           {/* Fretboard */}
           <div className="lg:col-span-2">
-            <div className="flex items-center justify-center rounded-3xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/60 backdrop-blur p-4 md:p-6 shadow-sm min-h-[420px]">
+            <div className="flex items-center justify-center rounded-3xl border border-[#D0E3FF] dark:border-[#1f2937] bg-white/80 dark:bg-[#020617]/90 backdrop-blur p-4 md:p-6 shadow-sm min-h-[420px]">
               {loading ? (
                 <BoardSkeleton />
               ) : currentScale ? (
@@ -364,7 +364,7 @@ export default function ScaleDiagram() {
   );
 }
 
-/* ---------------------------- Sub‑components ---------------------------- */
+/* ---------------------------- Sub-components ---------------------------- */
 
 function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
   const currentBox = currentScale.positions_by_box.find(
@@ -398,7 +398,7 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
       {/* Fretboard container với hiệu ứng gương */}
       <div
         className={[
-          "relative rounded-2xl border bg-gradient-to-b from-zinc-50 to-white dark:from-gray-950 dark:to-gray-900 border-gray-300 dark:border-gray-700 overflow-visible",
+          "relative rounded-2xl border bg-gradient-to-b from-[#F9FCFF] to-[#E7F1FF] dark:from-[#020617] dark:to-[#020617] border-[#D0E3FF] dark:border-[#1f2937] overflow-visible",
           leftHanded ? "[transform:scaleX(-1)]" : "",
         ].join(" ")}
         style={{ width, height }}
@@ -407,7 +407,7 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
         {Array.from({ length: frets + 1 }).map((_, i) => (
           <div
             key={`fret-${i}`}
-            className="absolute top-0 bottom-0 bg-gray-300 dark:bg-gray-600"
+            className="absolute top-0 bottom-0 bg-slate-300 dark:bg-slate-600"
             style={{
               left: `${i * fretWidth}px`,
               width: i === 0 ? "3px" : "1.5px",
@@ -433,7 +433,7 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
                 {Array.from({ length: dots }).map((__, idx) => (
                   <span
                     key={idx}
-                    className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 block"
+                    className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 block"
                   />
                 ))}
               </div>
@@ -450,15 +450,15 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
               key={`string-${si}`}
               className={
                 isThick
-                  ? "absolute left-0 right-0 bg-gray-800 dark:bg-gray-200"
-                  : "absolute left-0 right-0 border-t border-b border-dotted border-gray-400 dark:border-gray-500"
+                  ? "absolute left-0 right-0 bg-slate-800 dark:bg-slate-200"
+                  : "absolute left-0 right-0 border-t border-b border-dotted border-slate-400 dark:border-slate-500"
               }
               style={{ top: `${y}px`, height: isThick ? "2px" : "1px" }}
             />
           );
         })}
 
-        {/* Notes - Counter-flip nốt nhạc để chữ hiển thị đúng */}
+        {/* Notes */}
         {currentBox.positions
           .filter((p) => {
             const k = `${p.string}-${p.fret}`;
@@ -481,7 +481,6 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
                   "flex items-center justify-center text-[10px] leading-tight font-semibold",
                   "w-5 h-5 rounded-full shadow-sm ring-1 ring-black/10 dark:ring-white/10",
                   tonic ? "outline outline-2 outline-amber-400" : "",
-                  // Counter-flip chỉ áp dụng cho nốt khi left-handed
                   leftHanded
                     ? "[transform:translateX(-50%)_translateY(-50%)_scaleX(-1)]"
                     : "",
@@ -510,19 +509,18 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
             );
           })}
 
-        {/* String numbers BÊN TRONG fretboard - sẽ bị lật nhưng được counter-flip */}
+        {/* String numbers (bên trái) */}
         {Array.from({ length: strings }).map((_, si) => {
           const y = topMargin + si * stringSpacing;
-          const num = si + 1; // 1 ở trên, 6 ở dưới
+          const num = si + 1;
           return (
             <React.Fragment key={`snum-${si}`}>
-              {/* Số dây bên trái cần đàn */}
               <div
-                className="absolute w-6 text-right text-[12px] font-semibold text-gray-700 dark:text-gray-300 select-none"
+                className="absolute w-6 text-right text-[12px] font-semibold text-slate-700 dark:text-slate-300 select-none"
                 style={{
-                  left: "-44px", // lệch hẳn sang trái ngoài cần đàn
+                  left: "-44px",
                   top: `${y}px`,
-                  transform: "translateY(-50%)", // căn giữa theo dây
+                  transform: "translateY(-50%)",
                 }}
                 aria-hidden
                 title={`String ${num}`}
@@ -533,13 +531,12 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
           );
         })}
 
-        {/* Fret numbers BÊN TRONG fretboard - sẽ bị lật nhưng được counter-flip */}
+        {/* Fret numbers */}
         {Array.from({ length: frets }).map((_, i) => (
           <div
             key={`fnum-${i}`}
             className={[
-              "absolute text-[9px] font-medium text-gray-700 dark:text-gray-300 z-20",
-              // Counter-flip số phím đàn để giữ nguyên hướng khi left-handed
+              "absolute text-[9px] font-medium text-slate-700 dark:text-slate-300 z-20",
               leftHanded
                 ? "[transform:translateX(-50%)_scaleX(-1)]"
                 : "[transform:translateX(-50%)]",
@@ -560,14 +557,14 @@ function Fretboard({ currentScale, selectedBox, labelMode, leftHanded }) {
 function SidebarSkeleton() {
   return (
     <div className="animate-pulse space-y-5">
-      <div className="h-7 w-40 bg-gray-200 dark:bg-gray-800 rounded" />
+      <div className="h-7 w-40 bg-[#D0E3FF] dark:bg-slate-800 rounded" />
       {[1, 2, 3].map((i) => (
         <div key={i} className="space-y-2">
-          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-800 rounded" />
-          <div className="h-10 w-full bg-gray-200 dark:bg-gray-800 rounded-xl" />
+          <div className="h-4 w-24 bg-[#D0E3FF] dark:bg-slate-800 rounded" />
+          <div className="h-10 w-full bg-[#E7F1FF] dark:bg-slate-800 rounded-xl" />
         </div>
       ))}
-      <div className="h-28 w-full bg-gray-200 dark:bg-gray-800 rounded-2xl" />
+      <div className="h-28 w-full bg-[#E7F1FF] dark:bg-slate-800 rounded-2xl" />
     </div>
   );
 }
@@ -576,7 +573,7 @@ function BoardSkeleton() {
   return (
     <div className="flex flex-col items-center justify-center gap-3">
       <Spinner />
-      <p className="text-sm text-gray-500 dark:text-gray-400">
+      <p className="text-sm text-slate-500 dark:text-slate-400">
         Đang tải scale…
       </p>
     </div>
@@ -586,7 +583,7 @@ function BoardSkeleton() {
 function EmptyState() {
   return (
     <div className="text-center">
-      <p className="text-sm text-gray-600 dark:text-gray-300">
+      <p className="text-sm text-slate-600 dark:text-slate-300">
         Chọn Root + Type để hiển thị cần đàn
       </p>
     </div>
@@ -595,7 +592,7 @@ function EmptyState() {
 
 function Spinner() {
   return (
-    <div className="h-10 w-10 rounded-full border-2 border-gray-300 dark:border-gray-600 border-t-transparent animate-spin" />
+    <div className="h-10 w-10 rounded-full border-2 border-[#D0E3FF] dark:border-slate-600 border-t-transparent animate-spin" />
   );
 }
 

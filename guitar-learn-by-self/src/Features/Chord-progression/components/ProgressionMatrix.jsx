@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { MATRIX_LAYOUT } from "../logic/layout";
 import { useProgressionMatrix } from "../logic/useProgressionMatrix";
+import ProgressionViewerFrame from "./ProgressionViewerFrame";
 
 /* ===================== Note helpers ===================== */
 const SHARPS = [
@@ -37,14 +38,10 @@ const degreeToNote = (key, romanUpper, accidental = "") => {
   const cyc = preferFlats(key) ? FLATS : SHARPS;
   const root = cyc.indexOf(key);
   if (root < 0) return "";
-
   const i = DEGIDX[romanUpper] ?? 0;
   let s = (root + STEPS[i]) % 12;
-
-  // Xử lý accidental
   if (accidental === "b") s = (s - 1 + 12) % 12;
   if (accidental === "#") s = (s + 1) % 12;
-
   return cyc[s] || "";
 };
 
@@ -52,21 +49,17 @@ const degreeToNote = (key, romanUpper, accidental = "") => {
 const romanToLetter = (romanPart, key) => {
   const match = romanPart.match(ROMAN_SPLIT_RE);
   if (!match) return romanPart;
-
   const accidental = match[1] || "";
   const romanNumeral = match[2].toUpperCase();
   const suffix = match[3] || "";
-
   const note = degreeToNote(key, romanNumeral, accidental);
   if (!note) return romanPart;
-
   return `${note}${suffix}`;
 };
 
 const renderToken_RomanToLetter = (token, key) => {
   const s = String(token ?? "").trim();
   if (!s.includes("/")) return romanToLetter(s, key);
-
   const [L, R] = s.split("/").map((x) => x.trim());
   return `${romanToLetter(L, key)}/${romanToLetter(R, key)}`;
 };
@@ -101,7 +94,6 @@ const noteToRomanBase = (key, noteIdx) => {
   const cyc = preferFlats(key) ? FLATS : SHARPS;
   const root = cyc.indexOf(key);
   if (root < 0) return null;
-
   for (let di = 0; di < 7; di++) {
     const sem = (root + STEPS[di]) % 12;
     if (sem === noteIdx) return { acc: "", deg: di };
@@ -114,30 +106,20 @@ const noteToRomanBase = (key, noteIdx) => {
 const letterToRoman = (letterPart, key) => {
   const match = letterPart.match(/^([A-G][#b]?)(.*)$/i);
   if (!match) return letterPart;
-
   const noteName = match[1];
   const suffix = match[2];
-
   const noteIdx = NOTE_INDEX[noteName.toUpperCase()];
   if (noteIdx === undefined) return letterPart;
-
   const base = noteToRomanBase(key, noteIdx);
   if (!base) return letterPart;
-
   let roman = base.acc + DEG_ROMAN[base.deg];
-
-  // Giữ nguyên tất cả các hậu tố (m, dim, maj, m7, m(b5), etc.)
   return roman + suffix;
 };
 
 const renderToken_LetterToRoman = (token, key) => {
   const s = String(token ?? "").trim();
-
-  // Nếu đã là số La Mã thì giữ nguyên
   if (/^(b|#)?\s*(VII|VI|IV|III|II|V|I)/i.test(s)) return s;
-
   if (!s.includes("/")) return letterToRoman(s, key);
-
   const [L, R] = s.split("/").map((x) => x.trim());
   const left = letterToRoman(L, key);
   const right = letterToRoman(R, key);
@@ -148,33 +130,22 @@ const renderToken_LetterToRoman = (token, key) => {
 const renderTokenForResults = (token, key) => {
   const s = String(token ?? "").trim();
   if (!s.includes("/")) {
-    // Xử lý cho từng phần hợp âm
     const match = s.match(ROMAN_SPLIT_RE);
     if (!match) return s;
-
     const accidental = match[1] || "";
     const romanNumeral = match[2];
     const suffix = match[3] || "";
-
     const note = degreeToNote(key, romanNumeral.toUpperCase(), accidental);
     if (!note) return s;
-
-    // Nếu số La Mã viết thường (ví dụ: vi, iv, ii) thì thêm 'm' cho hợp âm thứ
     const isMinor = romanNumeral === romanNumeral.toLowerCase();
     const qualitySuffix = isMinor ? "m" + suffix : suffix;
-
     return `${note}${qualitySuffix}`;
   }
-
-  // Xử lý cho hợp âm có bass note (ví dụ: IV/vi)
   const [L, R] = s.split("/").map((x) => x.trim());
-
   const leftMatch = L.match(ROMAN_SPLIT_RE);
   const rightMatch = R.match(ROMAN_SPLIT_RE);
-
-  let leftResult = L;
-  let rightResult = R;
-
+  let leftResult = L,
+    rightResult = R;
   if (leftMatch) {
     const acc = leftMatch[1] || "";
     const roman = leftMatch[2];
@@ -185,7 +156,6 @@ const renderTokenForResults = (token, key) => {
       leftResult = `${note}${isMinor ? "m" + suffix : suffix}`;
     }
   }
-
   if (rightMatch) {
     const acc = rightMatch[1] || "";
     const roman = rightMatch[2];
@@ -196,28 +166,27 @@ const renderTokenForResults = (token, key) => {
       rightResult = `${note}${isMinor ? "m" + suffix : suffix}`;
     }
   }
-
   return `${leftResult}/${rightResult}`;
 };
 
 /* ===================== UI helpers ===================== */
 const pillBase =
-  "px-3 py-1 rounded-lg border text-sm transition select-none w-full text-center shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900";
+  "px-3 py-1 rounded-lg border text-sm transition select-none w-full text-center shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#D0E3FF] focus-visible:ring-offset-white dark:focus-visible:ring-offset-neutral-950";
 
 const colorFor = (state) => {
   if (state === "selected")
     return (
-      `${pillBase} bg-orange-500 text-white border-orange-600 hover:bg-orange-600 active:bg-orange-700 ` +
-      `dark:bg-orange-500 dark:text-white dark:border-orange-600 dark:hover:bg-orange-600`
+      `${pillBase} bg-[#334EAC] text-white border-[#061F5C] hover:bg-[#061F5C] ` +
+      `dark:bg-[#334EAC] dark:text-white dark:border-[#D0E3FF] dark:hover:bg-[#061F5C]`
     );
   if (state === "related")
     return (
-      `${pillBase} bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 ` +
-      `dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800 dark:hover:bg-amber-900/60`
+      `${pillBase} bg-[#E7F1FF] text-[#061F5C] border-[#D0E3FF] hover:bg-[#D0E3FF] ` +
+      `dark:bg-[#061F5C]/60 dark:text-[#F9FCFF] dark:border-[#D0E3FF]/70 dark:hover:bg-[#334EAC]/80`
     );
   return (
-    `${pillBase} bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200 ` +
-    `dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700`
+    `${pillBase} bg-white text-neutral-800 border-[#D0E3FF] hover:bg-[#F9FCFF] ` +
+    `dark:bg-neutral-900 dark:text-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800`
   );
 };
 
@@ -249,7 +218,6 @@ export default function ProgressionMatrix() {
     return s;
   }, [columnsSelected]);
 
-  // Hàm chuẩn hóa số La Mã để so sánh (bỏ qua case và các hậu tố phức tạp)
   const normalizeRoman = useCallback((degree) => {
     if (!degree) return "";
     const match = String(degree).match(/^(b|#)?\s*(VII|VI|IV|III|II|V|I)/i);
@@ -259,40 +227,27 @@ export default function ProgressionMatrix() {
 
   const relatedSet = useMemo(() => {
     const r = new Set();
-
-    // Tạo set các số La Mã đã được chuẩn hóa từ selectedSet
     const normalizedSelected = new Set();
     selectedSet.forEach((token) => {
       normalizedSelected.add(normalizeRoman(token));
     });
-
-    // Duyệt qua tất cả các progression
     progressions.forEach((p) => {
       const degrees = p.degrees || [];
-
-      // Kiểm tra xem progression này có chứa BẤT KỲ hợp âm nào đang được chọn không
       const containsSelected = degrees.some((degree) => {
         const normalizedDegree = normalizeRoman(degree);
         return normalizedSelected.has(normalizedDegree);
       });
-
-      // Nếu có, thêm TẤT CẢ các hợp âm trong progression này vào relatedSet
       if (containsSelected) {
         degrees.forEach((degree) => {
-          // Kiểm tra xem hợp âm này có trong selectedSet không (so sánh chuẩn hóa)
           const normalizedDegree = normalizeRoman(degree);
           const isSelected = Array.from(selectedSet).some(
             (selectedToken) =>
               normalizeRoman(selectedToken) === normalizedDegree
           );
-
-          if (!isSelected) {
-            r.add(degree);
-          }
+          if (!isSelected) r.add(degree);
         });
       }
     });
-
     return r;
   }, [progressions, selectedSet, normalizeRoman]);
 
@@ -311,11 +266,9 @@ export default function ProgressionMatrix() {
         new Set((col.rows || []).flat().filter(Boolean))
       );
       if (tokens.length === 0) return;
-
       const groupRoman = groupRomanOfColumn(col);
       const gIdx = groupIndexForRoman(romans, groupRoman);
       const allSelected = tokens.every((t) => isTokenSelected(t));
-
       tokens.forEach((t) => {
         if (allSelected && isTokenSelected(t)) toggleToken(gIdx, t);
         if (!allSelected && !isTokenSelected(t)) toggleToken(gIdx, t);
@@ -333,21 +286,36 @@ export default function ProgressionMatrix() {
     [headerMode, currentKey]
   );
 
+  // === Frame state (full-screen progression viewer) ===
+  const [frameOpen, setFrameOpen] = useState(false);
+  const [frameTitle, setFrameTitle] = useState("");
+  const [frameSymbols, setFrameSymbols] = useState([]);
+
+  const openProgressionFrame = useCallback(
+    (p) => {
+      const symbols = renderDegreesForResults(p.degrees);
+      setFrameTitle(p.title || "Progression");
+      setFrameSymbols(symbols);
+      setFrameOpen(true);
+    },
+    [renderDegreesForResults]
+  );
+
   const ROWS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 bg-[#F9FCFF] text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100 transition-colors">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap rounded-2xl border bg-gray-50/60 dark:bg-gray-900/60 dark:border-gray-800 px-3 py-2 md:px-4 md:py-3 shadow-sm">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D0E3FF] bg-gradient-to-r from-[#D0E3FF]/70 via-[#E7F1FF]/70 to-[#F9FCFF]/70 px-3 py-2 md:px-4 md:py-3 shadow-sm dark:border-white/10 dark:from-[#061F5C] dark:via-[#334EAC] dark:to-[#7096D1]">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-300">
+            <span className="text-sm text-neutral-700 dark:text-neutral-200">
               Key
             </span>
             <select
               value={currentKey}
               onChange={(e) => setCurrentKey(e.target.value)}
-              className="border rounded-lg px-3 py-2 bg-white/90 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="border border-[#D0E3FF] rounded-lg px-3 py-2 bg-white/90 text-[#061F5C] text-sm dark:bg-[#061F5C] dark:text-[#F9FCFF] dark:border-white/30 focus:outline-none focus:ring-2 focus:ring-[#D0E3FF]"
               aria-label="Chọn Key"
             >
               {MATRIX_LAYOUT.keysMajor.map((k) => (
@@ -358,13 +326,13 @@ export default function ProgressionMatrix() {
             </select>
           </div>
 
-          <div className="inline-flex rounded-xl overflow-hidden border bg-white dark:bg-gray-900 dark:border-gray-700 shadow-sm">
+          <div className="inline-flex rounded-xl overflow-hidden border border-[#D0E3FF] bg-white/90 dark:bg-[#061F5C] dark:border-white/30 shadow-sm">
             <button
               onClick={() => setHeaderMode("roman")}
               className={`px-3 py-2 text-sm transition focus:outline-none ${
                 headerMode === "roman"
-                  ? "bg-indigo-600 text-white dark:bg-indigo-600"
-                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                  ? "bg-[#334EAC] text-white"
+                  : "bg-transparent text-[#061F5C] hover:bg-[#E7F1FF] dark:text-[#F9FCFF] dark:hover:bg-[#334EAC]/70"
               }`}
               aria-pressed={headerMode === "roman"}
             >
@@ -374,8 +342,8 @@ export default function ProgressionMatrix() {
               onClick={() => setHeaderMode("letter")}
               className={`px-3 py-2 text-sm transition focus:outline-none ${
                 headerMode === "letter"
-                  ? "bg-indigo-600 text-white dark:bg-indigo-600"
-                  : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                  ? "bg-[#334EAC] text-white"
+                  : "bg-transparent text-[#061F5C] hover:bg-[#E7F1FF] dark:text-[#F9FCFF] dark:hover:bg-[#334EAC]/70"
               }`}
               aria-pressed={headerMode === "letter"}
             >
@@ -385,21 +353,21 @@ export default function ProgressionMatrix() {
         </div>
 
         {/* Legend nhỏ */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md border bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-[#D0E3FF] bg-white text-neutral-800 dark:bg-neutral-900 dark:text-neutral-100 dark:border-neutral-700">
             • Normal
           </span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md border bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-[#D0E3FF] bg-[#E7F1FF] text-[#061F5C] dark:bg-[#061F5C]/60 dark:text-[#F9FCFF] dark:border-[#D0E3FF]/70">
             • Related
           </span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md border bg-orange-500 text-white border-orange-600">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-[#061F5C] bg-[#334EAC] text-white">
             • Selected
           </span>
         </div>
       </div>
 
       {/* Matrix */}
-      <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 overflow-hidden shadow-md">
+      <div className="rounded-2xl border border-[#D0E3FF] bg-white dark:bg-neutral-900 dark:border-neutral-800 overflow-hidden shadow-md">
         {/* Header */}
         <div
           className="grid"
@@ -414,19 +382,18 @@ export default function ProgressionMatrix() {
               const roman = c.roman;
               const big = headerMode === "roman" ? roman : note;
               const small = headerMode === "roman" ? note : roman;
-
               return (
                 <button
                   key={`h-${idx}`}
                   onClick={() => onHeaderClick(c)}
-                  className="px-2 py-2 text-center hover:opacity-95 focus:outline-none group transition bg-gradient-to-b from-sky-700 to-sky-800 text-white dark:from-sky-800 dark:to-sky-900 border-r border-sky-900/30 dark:border-sky-900/50"
+                  className="px-2 py-2 text-center hover:opacity-95 focus:outline-none group transition bg-gradient-to-b from-[#334EAC] to-[#061F5C] text-white border-r border-[#061F5C]/50 dark:border-[#061F5C]/80"
                   title="Chọn/Bỏ chọn toàn cột"
                 >
                   <div className="font-semibold text-base tracking-wide">
                     {big}
                   </div>
                   <div className="text-[11px] opacity-90">{small}</div>
-                  <div className="h-[3px] w-8 bg-white/70 mx-auto mt-1 rounded group-hover:w-10 transition-all"></div>
+                  <div className="h-[3px] w-8 bg-white/70 mx-auto mt-1 rounded group-hover:w-10 transition-all" />
                 </button>
               );
             }
@@ -434,11 +401,11 @@ export default function ProgressionMatrix() {
               <button
                 key={`h-${idx}`}
                 onClick={() => onHeaderClick(c)}
-                className="px-1 py-2 text-center scale-x-75 origin-center hover:opacity-95 focus:outline-none bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200 border-r border-sky-200 dark:border-sky-900/60"
+                className="px-1 py-2 text-center scale-x-75 origin-center hover:opacity-95 focus:outline-none bg-[#D0E3FF] text-[#061F5C] border-r border-[#B8CCF2] dark:bg-[#061F5C] dark:text-[#F9FCFF] dark:border-[#334EAC]"
                 title="Chọn/Bỏ chọn cột bắc cầu"
               >
                 <div className="text-xs font-medium">{c.between}</div>
-                <div className="h-[2px] w-6 bg-sky-300 dark:bg-sky-600 mx-auto mt-1 rounded"></div>
+                <div className="h-[2px] w-6 bg-[#7096D1] dark:bg-[#D0E3FF] mx-auto mt-1 rounded" />
               </button>
             );
           })}
@@ -448,7 +415,7 @@ export default function ProgressionMatrix() {
         {ROWS.map((rowIdx) => (
           <div
             key={`row-${rowIdx}`}
-            className="grid gap-x-1 gap-y-2 p-2 border-t border-gray-200/60 dark:border-gray-800/80"
+            className="grid gap-x-1 gap-y-2 p-2 border-t border-[#E0E9FF] dark:border-neutral-800"
             style={{
               gridTemplateColumns: `repeat(${columns12.length},minmax(0,1fr))`,
             }}
@@ -456,7 +423,6 @@ export default function ProgressionMatrix() {
             {columns12.map((c, ci) => {
               const tokens = c.rows?.[rowIdx] || [];
               const groupRoman = groupRomanOfColumn(c);
-
               return (
                 <div
                   key={`cell-${rowIdx}-${ci}`}
@@ -469,12 +435,10 @@ export default function ProgressionMatrix() {
                         : relatedSet.has(tok)
                         ? "related"
                         : "normal";
-
                       const label =
                         headerMode === "roman"
                           ? renderToken_RomanToLetter(tok, currentKey)
                           : renderToken_LetterToRoman(tok, currentKey);
-
                       return (
                         <button
                           key={`${rowIdx}-${ci}-${tok}`}
@@ -498,35 +462,59 @@ export default function ProgressionMatrix() {
       {/* Results */}
       <section className="space-y-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">Progressions</h2>
+          <h2 className="text-lg font-semibold text-[#061F5C] dark:text-[#F9FCFF]">
+            Progressions
+          </h2>
           {loading && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-neutral-500 dark:text-neutral-300">
               Loading...
             </span>
           )}
-          {error && <span className="text-sm text-red-600">{error}</span>}
+          {error && (
+            <span className="text-sm text-rose-600 dark:text-rose-400">
+              {error}
+            </span>
+          )}
         </div>
 
         {!loading && !error && progressions.length === 0 && (
-          <div className="text-gray-600 dark:text-gray-400 text-sm rounded-xl border bg-gray-50/60 dark:bg-gray-900/60 dark:border-gray-800 px-4 py-3">
+          <div className="text-neutral-600 dark:text-neutral-300 text-sm rounded-xl border border-[#D0E3FF] bg-white/80 dark:bg-neutral-900/70 dark:border-neutral-700 px-4 py-3">
             No matching progressions found.
           </div>
         )}
 
+        {/* Card list */}
         <div className="grid md:grid-cols-2 gap-3">
           {progressions.map((p) => (
-            <div
+            <button
               key={p._id || p.id || p.title}
-              className="rounded-xl border p-3 bg-white dark:bg-gray-900 dark:border-gray-800 shadow-sm hover:shadow-md transition"
+              onClick={() => openProgressionFrame(p)}
+              className="text-left rounded-2xl border border-[#D0E3FF] bg-white/95 dark:bg-neutral-900 dark:border-neutral-700 shadow-sm hover:shadow-md hover:border-[#7096D1] transition focus:outline-none focus:ring-2 focus:ring-[#D0E3FF] px-5 py-4"
+              title="Xem thế bấm của vòng này"
             >
-              <div className="font-semibold">{p.title || "Untitled"}</div>
-              <div className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+              <div className="font-semibold text-[#061F5C] dark:text-[#F9FCFF]">
+                {p.title || "Untitled"}
+              </div>
+              <div className="text-sm text-neutral-700 dark:text-neutral-200 mt-1">
                 {renderDegreesForResults(p.degrees).join(" – ")}
               </div>
-            </div>
+              <div className="mt-3 inline-flex items-center gap-2 text-xs text-[#334EAC] dark:text-[#D0E3FF]">
+                <span>Xem thế bấm</span>
+                <span>→</span>
+              </div>
+            </button>
           ))}
         </div>
       </section>
+
+      {/* Full-screen frame hiển thị thế bấm của vòng đã chọn */}
+      <ProgressionViewerFrame
+        open={frameOpen}
+        onClose={() => setFrameOpen(false)}
+        title={frameTitle}
+        keyName={currentKey}
+        symbols={frameSymbols}
+      />
     </div>
   );
 }

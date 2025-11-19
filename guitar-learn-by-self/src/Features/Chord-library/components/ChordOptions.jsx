@@ -1,10 +1,7 @@
-// ChordOptions.jsx (revamped UI)
-// - Modern 2‑pane layout, sticky sidebar header
-// - Search + quick filters (Category, Difficulty)
-// - Beautiful list items with tags & difficulty chips
-// - Shape selector pills, better empty/error/loading states
-// - Dark mode friendly (uses `dark:` Tailwind classes)
-// - Accessible (aria roles, keyboard focus)
+// ChordOptions.jsx (themed to match navbar palette)
+// - 2-pane layout, sticky sidebar header
+// - Search + filters
+// - Cards, pills, chips dùng tone xanh navy/pastel giống Navbar
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
@@ -21,13 +18,13 @@ const API_BASE =
 const Chip = ({ children, tone = "neutral", className = "" }) => {
   const toneMap = {
     neutral:
-      "bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700",
+      "bg-[#E7F1FF] text-[#061F5C] border-[#D0E3FF] dark:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700",
     green:
       "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800",
     amber:
       "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800",
     red: "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800",
-    blue: "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-800",
+    blue: "bg-[#D0E3FF] text-[#061F5C] border-[#7096D1] dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-800",
   };
   return (
     <span
@@ -40,7 +37,7 @@ const Chip = ({ children, tone = "neutral", className = "" }) => {
 
 const Skeleton = ({ className = "" }) => (
   <div
-    className={`animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-700 ${className}`}
+    className={`animate-pulse rounded-xl bg-[#E7F1FF] dark:bg-neutral-700 ${className}`}
   />
 );
 
@@ -148,12 +145,12 @@ const ChordOptions = () => {
 
   /* --------------------------------- Render --------------------------------- */
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
-      <div className="grid h-screen grid-cols-[300px_1fr]">
+    <div className="min-h-screen bg-[#F9FCFF] text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
+      <div className="grid h-screen md:grid-cols-[340px_1fr] grid-cols-1">
         {/* Sidebar */}
-        <aside className="border-r border-neutral-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60">
-          <div className="sticky top-0 z-10 space-y-3 border-b border-neutral-200 p-4 dark:border-neutral-800 bg-inherit">
-            <h2 className="text-lg font-semibold tracking-tight">
+        <aside className="border-r border-[#D0E3FF] bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-white/10 dark:bg-[#061F5C]/80">
+          <div className="sticky top-0 z-10 space-y-3 border-b border-[#D0E3FF] p-4 bg-gradient-to-r from-[#D0E3FF]/90 via-[#E7F1FF]/90 to-[#F9FCFF]/90 dark:border-white/10 dark:from-[#061F5C] dark:via-[#334EAC] dark:to-[#7096D1]">
+            <h2 className="text-lg font-semibold tracking-tight text-[#061F5C] dark:text-[#F9FCFF]">
               Danh sách hợp âm
             </h2>
             <div className="flex gap-2">
@@ -162,13 +159,13 @@ const ChordOptions = () => {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Tìm theo tên/alias..."
-                  className="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-neutral-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500 dark:focus:border-sky-400 dark:focus:ring-sky-900/40"
+                  className="w-full rounded-xl border border-[#D0E3FF] bg-white px-3 py-2 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-[#334EAC] focus:ring-2 focus:ring-[#D0E3FF] dark:border-white/20 dark:bg-[#061F5C] dark:text-white dark:placeholder:text-neutral-300 dark:focus:border-[#D0E3FF] dark:focus:ring-[#334EAC]/50"
                 />
               </div>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="rounded-xl border border-neutral-300 bg-white px-1 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                className="rounded-xl border border-[#D0E3FF] bg-white px-2 py-2 text-sm text-neutral-800 dark:border-white/20 dark:bg-[#061F5C] dark:text-neutral-50"
               >
                 {categoryOptions.map((opt) => (
                   <option key={opt} value={opt}>
@@ -179,8 +176,7 @@ const ChordOptions = () => {
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
-                className="rounded-xl border border-neutral-300 bg-white px-1
-                 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+                className="rounded-xl border border-[#D0E3FF] bg-white px-2 py-2 text-sm text-neutral-800 dark:border-white/20 dark:bg-[#061F5C] dark:text-neutral-50"
               >
                 {difficultyOptions.map((opt) => (
                   <option key={opt} value={opt}>
@@ -193,7 +189,7 @@ const ChordOptions = () => {
 
           <div
             ref={listRef}
-            className="h-[calc(100vh-96px)] overflow-y-auto p-3"
+            className="h-[calc(100vh-96px)] overflow-y-auto p-3 space-y-2"
           >
             {loading.chords ? (
               <div className="space-y-2">
@@ -202,7 +198,7 @@ const ChordOptions = () => {
                 ))}
               </div>
             ) : error.chords ? (
-              <div className="m-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              <div className="m-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
                 {error.chords}
               </div>
             ) : filteredChords.length === 0 ? (
@@ -217,19 +213,19 @@ const ChordOptions = () => {
                     <li key={chord._id}>
                       <button
                         onClick={() => handleChordSelect(chord)}
-                        className={`group block w-full rounded-xl border p-3 text-left transition-all hover:-translate-y-[1px] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 dark:focus:ring-sky-800 ${
+                        className={`group block w-full rounded-xl border p-3 text-left transition-all hover:-translate-y-[1px] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D0E3FF] dark:focus:ring-[#334EAC] ${
                           isActive
-                            ? "border-sky-500 bg-sky-50 dark:border-sky-600 dark:bg-sky-900/10"
-                            : "border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900"
+                            ? "border-[#334EAC] bg-[#E7F1FF] dark:border-[#D0E3FF] dark:bg-[#061F5C]"
+                            : "border-[#D0E3FF] bg-white hover:border-[#7096D1] dark:border-white/10 dark:bg-[#061F5C]/60"
                         }`}
                         aria-current={isActive ? "true" : undefined}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <div className="font-medium leading-6 tracking-tight">
+                            <div className="font-medium leading-6 tracking-tight text-[#061F5C] dark:text-[#F9FCFF]">
                               {chord.name}
                             </div>
-                            <div className="mt-1 line-clamp-1 text-xs text-neutral-500">
+                            <div className="mt-1 line-clamp-1 text-xs text-neutral-500 dark:text-neutral-300">
                               {(chord.categories || []).join(", ") ||
                                 "No categories"}
                             </div>
@@ -249,16 +245,16 @@ const ChordOptions = () => {
 
         {/* Main content */}
         <main className="flex min-h-0 flex-col overflow-hidden">
-          <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 p-4 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-neutral-800 dark:bg-neutral-900/60">
+          <header className="sticky top-0 z-10 border-b border-[#D0E3FF] bg-gradient-to-r from-[#D0E3FF]/90 via-[#E7F1FF]/90 to-[#F9FCFF]/90 p-4 backdrop-blur dark:border-white/10 dark:from-[#061F5C] dark:via-[#334EAC] dark:to-[#7096D1]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h1 className="text-xl font-semibold tracking-tight">
+                <h1 className="text-xl font-semibold tracking-tight text-[#061F5C] dark:text-[#F9FCFF]">
                   {selectedChord
                     ? `${selectedChord.name} Chord`
                     : "Chọn một hợp âm"}
                 </h1>
                 {selectedChord?.description && (
-                  <p className="mt-1 max-w-3xl text-sm text-neutral-600 dark:text-neutral-300">
+                  <p className="mt-1 max-w-3xl text-sm text-neutral-700 dark:text-neutral-200">
                     {selectedChord.description}
                   </p>
                 )}
@@ -266,7 +262,7 @@ const ChordOptions = () => {
             </div>
           </header>
 
-          <section className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+          <section className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
             {/* Shapes toolbar */}
             {loading.shapes && (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -277,14 +273,14 @@ const ChordOptions = () => {
             )}
 
             {error.shapes && (
-              <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
                 {error.shapes}
               </div>
             )}
 
             {selectedChord ? (
               <>
-                <div className="mb-5 flex flex-wrap gap-2">
+                <div className="mb-2 flex flex-wrap gap-2">
                   {shapes.length > 0 ? (
                     shapes.map((shape) => {
                       const active = selectedShape?._id === shape._id;
@@ -293,10 +289,10 @@ const ChordOptions = () => {
                         <button
                           key={shape._id}
                           onClick={() => setSelectedShape(shape)}
-                          className={`rounded-full border px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-sky-300 dark:focus:ring-sky-800 ${
+                          className={`rounded-full border px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#D0E3FF] dark:focus:ring-[#334EAC] ${
                             active
-                              ? "border-sky-500 bg-sky-50 text-sky-900 dark:border-sky-600 dark:bg-sky-900/20 dark:text-sky-200"
-                              : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                              ? "border-[#334EAC] bg-[#D0E3FF] text-[#061F5C] dark:border-[#D0E3FF] dark:bg-[#061F5C] dark:text-[#F9FCFF]"
+                              : "border-[#D0E3FF] bg-white text-neutral-700 hover:border-[#7096D1] hover:bg-[#E7F1FF] dark:border-white/20 dark:bg-[#061F5C] dark:text-neutral-100 dark:hover:bg-[#334EAC]/60"
                           }`}
                           title={`${shape.type} ${shape.variation || ""}${
                             barre
@@ -325,9 +321,9 @@ const ChordOptions = () => {
 
                 {selectedShape ? (
                   <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
-                    <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <div className="rounded-2xl border border-[#D0E3FF] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#061F5C]">
                       <div className="mb-3 flex items-center justify-between">
-                        <div className="text-sm text-neutral-500">
+                        <div className="text-sm text-neutral-600 dark:text-neutral-200">
                           Sơ đồ thế bấm
                         </div>
                         <div className="text-xs text-neutral-400">
@@ -335,7 +331,7 @@ const ChordOptions = () => {
                         </div>
                       </div>
                       <Fretboard shape={selectedShape} />
-                      <div className="mt-4 text-sm text-neutral-600 dark:text-neutral-300">
+                      <div className="mt-4 text-sm text-neutral-700 dark:text-neutral-100">
                         <span className="font-semibold">Type:</span>{" "}
                         {selectedShape.type}
                         {selectedShape.barre && (
@@ -352,8 +348,8 @@ const ChordOptions = () => {
                     </div>
 
                     <div className="space-y-5">
-                      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-                        <h3 className="mb-2 text-base font-semibold">
+                      <div className="rounded-2xl border border-[#D0E3FF] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#061F5C]">
+                        <h3 className="mb-2 text-base font-semibold text-[#061F5C] dark:text-[#F9FCFF]">
                           Ghi chú
                         </h3>
                         <div className="flex flex-wrap gap-2">
@@ -364,15 +360,15 @@ const ChordOptions = () => {
                               </Chip>
                             ))
                           ) : (
-                            <span className="text-sm text-neutral-500">
+                            <span className="text-sm text-neutral-500 dark:text-neutral-200">
                               No notes info
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-                        <h3 className="mb-2 text-base font-semibold">
+                      <div className="rounded-2xl border border-[#D0E3FF] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#061F5C]">
+                        <h3 className="mb-2 text-base font-semibold text-[#061F5C] dark:text-[#F9FCFF]">
                           Phù hợp với
                         </h3>
                         <div className="flex flex-wrap gap-2">
@@ -383,7 +379,7 @@ const ChordOptions = () => {
                               </Chip>
                             ))
                           ) : (
-                            <span className="text-sm text-neutral-500">
+                            <span className="text-sm text-neutral-500 dark:text-neutral-200">
                               No information
                             </span>
                           )}
@@ -392,7 +388,7 @@ const ChordOptions = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid place-items-center rounded-2xl border border-dashed border-neutral-300 p-10 text-neutral-500 dark:border-neutral-700">
+                  <div className="grid place-items-center rounded-2xl border border-dashed border-[#D0E3FF] bg-white/60 p-10 text-neutral-500 dark:border-white/20 dark:bg-[#061F5C]/40">
                     Hãy chọn một shape để xem sơ đồ.
                   </div>
                 )}
@@ -400,11 +396,11 @@ const ChordOptions = () => {
             ) : (
               <div className="grid h-[60vh] place-items-center">
                 <div className="text-center">
-                  <div className="mx-auto mb-4 h-16 w-16 rounded-full border border-dashed border-neutral-300 dark:border-neutral-700" />
-                  <h3 className="text-lg font-semibold">
+                  <div className="mx-auto mb-4 h-16 w-16 rounded-full border border-dashed border-[#D0E3FF] bg-white/70 dark:border-white/30 dark:bg-[#061F5C]/40" />
+                  <h3 className="text-lg font-semibold text-[#061F5C] dark:text-[#F9FCFF]">
                     Vui lòng chọn một hợp âm từ danh sách
                   </h3>
-                  <p className="mt-1 text-sm text-neutral-500">
+                  <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-200">
                     Tìm kiếm theo tên, lọc theo Category/Difficulty ở thanh bên
                     trái.
                   </p>

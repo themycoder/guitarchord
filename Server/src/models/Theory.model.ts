@@ -1,145 +1,77 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+// models/Theory.model.ts
+import { Schema, model, Document } from "mongoose";
 
-/** ---------------------------------------------
- * Block types (frontend renders these)
- * ----------------------------------------------*/
-export type BlockType =
-  | "heading"
-  | "paragraph"
-  | "list"
-  | "image"
-  | "chord"
-  | "code"
-  | "callout"
-  | "quote"
-  | "divider"
-  | "columns";
-
-/** Base block (flexible `props` to keep UI extensible) */
+/** Kiểu block cơ bản, linh hoạt props */
 export interface IBlock {
-  type: BlockType;
-  // Keep it generic; the Admin builder is responsible for validating shape
+  type: string;
   props?: Record<string, any>;
-  id?: string; // optional stable id to help client diff
 }
 
-/** ---------------------------------------------
- * Theory Article
- * ----------------------------------------------*/
-export interface ITheoryArticle extends Document {
+export interface ITheory extends Document {
+  theory_id: string; // định danh để map sang ML
   title: string;
-  slug: string;
-  excerpt?: string;
-  cover?: string;
   tags: string[];
+  skills: string[];
+  level: "beginner" | "intermediate" | "advanced";
+  difficulty: number; // 1..5
+  summary?: string; // mô tả ngắn (giữ để tương thích)
+  excerpt?: string; // tóm tắt hiển thị FE
+  cover?: string; // ảnh cover (URL)
+  contentUrl?: string;
+
   status: "draft" | "published" | "archived";
-  authorId?: string; // your user _id or external id
-  blocks: IBlock[];
-  // SEO / meta
-  meta?: {
-    description?: string;
-    keywords?: string[];
+  contentBlocks?: {
+    blocks: IBlock[];
   };
-  // housekeeping
-  createdAt: Date;
-  updatedAt: Date;
+
+  // meta khác có thể bổ sung sau
 }
 
 const BlockSchema = new Schema<IBlock>(
   {
-    type: {
-      type: String,
-      required: true,
-      enum: [
-        "heading",
-        "paragraph",
-        "list",
-        "image",
-        "chord",
-        "code",
-        "callout",
-        "quote",
-        "divider",
-        "columns",
-      ],
-      index: true,
-    },
-    props: { type: Schema.Types.Mixed }, // flexible, supports any block props
-    id: { type: String },
+    type: { type: String, required: true },
+    props: { type: Schema.Types.Mixed, default: {} },
   },
-  { _id: false } // blocks are embedded; no separate ObjectId needed
+  { _id: false }
 );
 
-const TheoryArticleSchema = new Schema<ITheoryArticle>(
+const schema = new Schema<ITheory>(
   {
-    title: { type: String, required: true, trim: true, maxlength: 200 },
-    slug: {
+    theory_id: { type: String, unique: true, required: true, index: true },
+    title: { type: String, required: true },
+
+    tags: { type: [String], default: [] },
+    skills: { type: [String], default: [] },
+
+    level: {
       type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      index: true,
+      enum: ["beginner", "intermediate", "advanced"],
+      default: "beginner",
     },
-    excerpt: { type: String, maxlength: 500 },
-    cover: { type: String },
-    tags: { type: [String], default: [], index: true },
+    difficulty: { type: Number, default: 1, min: 1, max: 5 },
+
+    summary: String, // legacy
+    excerpt: { type: String }, // dùng cho UI
+    cover: { type: String }, // dùng cho UI
+    contentUrl: String,
+
     status: {
       type: String,
       enum: ["draft", "published", "archived"],
       default: "draft",
       index: true,
     },
-    authorId: { type: String },
-    blocks: { type: [BlockSchema], default: [] },
-    meta: {
-      description: { type: String, maxlength: 300 },
-      keywords: { type: [String], default: [] },
+
+    contentBlocks: {
+      blocks: { type: [BlockSchema], default: [] },
     },
   },
-  {
-    timestamps: true, // adds createdAt, updatedAt
-    versionKey: false,
-  }
+  { timestamps: true }
 );
 
-/** ---------------------------------------------
- * Helpers: slugify + pre-save
- * ----------------------------------------------*/
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "") // remove accents
-    .replace(/[^a-z0-9\s-]/g, "") // keep safe chars
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .substring(0, 80);
-}
-
-TheoryArticleSchema.pre("validate", function (next) {
-  if (!this.slug && this.title) {
-    this.slug = slugify(this.title);
-  }
-  next();
-});
-
-/** Optional: prevent duplicate slugs on title clashes by appending suffix */
-TheoryArticleSchema.pre("save", async function (next) {
-  if (!this.isModified("slug")) return next();
-
-  const Model = mongoose.model<ITheoryArticle>("TheoryArticle");
-  let base = this.slug;
-  let candidate = base;
-  let i = 2;
-
-  while (await Model.exists({ slug: candidate, _id: { $ne: this._id } })) {
-    candidate = `${base}-${i++}`;
-  }
-  this.slug = candidate;
-  next();
-});
-
-export const TheoryArticle: Model<ITheoryArticle> =
-  mongoose.models.TheoryArticle ||
-  mongoose.model<ITheoryArticle>("TheoryArticle", TheoryArticleSchema);
+schema.index({ title: "text", summary: "text" });
+schema.index({ tags: 1 });
+schema.index({ skills: 1 });
+schema.index({ level: 1, difficulty: 1 });
+schema.index({ status: 1 });
+export default model<ITheory>("Theory", schema);

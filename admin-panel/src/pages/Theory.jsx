@@ -1,513 +1,697 @@
-import React, { useEffect, useState } from "react";
+// src/admin/pages/Theory.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import { api } from "../lib/apiClient";
 
-
-
-const API_BASE =
-  (typeof window !== "undefined" && window.__API_BASE__) ||
-  (typeof process !== "undefined" &&
-    process.env &&
-    process.env.NEXT_PUBLIC_API_BASE) ||
-  "http://localhost:3000/api";
-
+/** ===== HELPERS ===== */
 const cx = (...a) => a.filter(Boolean).join(" ");
+
 const tones = ["info", "success", "warning", "danger"];
 
-function slugify(input) {
-  return (input || "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "") // remove accents
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .substring(0, 80);
-}
-
-export default function Theory() {
-  const [article, setArticle] = useState({
-    title: "",
-    slug: "",
-    excerpt: "",
-    cover: "",
-    tags: [],
-    status: "draft",
-    blocks: [],
-  });
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
-  const [dragIndex, setDragIndex] = useState(null);
-  const [loadSlug, setLoadSlug] = useState("");
-  const EMPTY = { title:"", slug:"", excerpt:"", cover:"", tags:[], status:"draft", blocks:[] };
-const [tab, setTab] = useState("list"); // "list" | "edit"
-
-  function update(key, value) {
-    setArticle((a) => ({ ...a, [key]: value }));
-  }
-function newArticle() {
-  setArticle(EMPTY);
-  setLoadSlug("");
-  setTab("edit");
-}
-  function addBlock(type) {
-    const empty = {
-      heading: { level: 2, text: "", id: undefined },
-      paragraph: { text: "" },
-      list: { items: [], ordered: false },
-      image: { src: "", alt: "", caption: "", width: "100%" },
-      chord: {
-        name: "",
-        startFret: 1,
-        strings: ["x", "x", "x", "x", "x", "x"],
-        fingers: [null, null, null, null, null, null],
-      },
-      code: { language: "", code: "" },
-      callout: { title: "", text: "", tone: "info" },
-      quote: { text: "", cite: "" },
-      divider: {},
-      columns: { columns: [[], []] },
-    };
-    setArticle((a) => ({
-      ...a,
-      blocks: [...a.blocks, { type, props: empty[type] }],
-    }));
-  }
-
-  function moveBlock(from, to) {
-    setArticle((a) => {
-      const arr = [...a.blocks];
-      if (to < 0 || to >= arr.length) return a;
-      const [it] = arr.splice(from, 1);
-      arr.splice(to, 0, it);
-      return { ...a, blocks: arr };
-    });
-  }
-
-  function removeBlock(idx) {
-    setArticle((a) => ({ ...a, blocks: a.blocks.filter((_, i) => i !== idx) }));
-  }
-
-  function handleDragStart(i) {
-    setDragIndex(i);
-  }
-  function handleDragOver(e, i) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }
-  function handleDrop(i) {
-    if (dragIndex === null || dragIndex === i) return;
-    moveBlock(dragIndex, i);
-    setDragIndex(null);
-  }
-
-  async function existsBySlug(slug) {
-    if (!slug) return false;
-    try {
-      const res = await fetch(`${API_BASE}/theory/${encodeURIComponent(slug)}`);
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-async function loadBySlugParam(slug) {
-  setLoading(true);
-  setError(null);
-  setMessage(null);
+/** Giải mã JWT rất nhẹ không cần lib */
+function decodeJWT(token) {
   try {
-    const res = await fetch(`${API_BASE}/theory/${encodeURIComponent(slug)}`);
-    if (!res.ok) throw new Error("Không tìm thấy bài với slug đó.");
-    const json = await res.json();
-    setArticle(json.data);
-    setMessage("Đã nạp bài để chỉnh sửa.");
-    setTab("edit");
-  } catch (e) {
-    setError(String(e.message || e));
-  } finally {
-    setLoading(false);
-    setTimeout(() => setMessage(null), 2500);
+    const [, p] = String(token || "").split(".");
+    return p ? JSON.parse(atob(p)) : null;
+  } catch {
+    return null;
   }
 }
-  async function save(publish = false) {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const payload = {
-        ...article,
-        status: publish ? "published" : article.status,
-      };
-      const method =
-        article._id || (await existsBySlug(article.slug)) ? "PATCH" : "POST";
-      const url =
-        method === "POST"
-          ? `${API_BASE}/theory`
-          : `${API_BASE}/theory/${encodeURIComponent(article.slug)}`;
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`${method} failed: HTTP ${res.status}`);
-      const json = await res.json();
-      setArticle(json.data);
-      setMessage(
-        method === "POST" ? "Đã tạo bài thành công." : "Đã lưu cập nhật."
+function getCurrentUserFromToken() {
+  const { accessToken } = api.readTokens?.() || {};
+  const payload = decodeJWT(accessToken);
+  // payload thường có: sub, role, displayName, iat, exp
+  return payload || null;
+}
+
+/** ===== BLOCK PRESETS ===== */
+const BASE_BLOCKS = {
+  heading: { level: 2, text: "", id: undefined },
+  paragraph: { text: "" },
+  list: { items: [], ordered: false },
+  image: { src: "", alt: "", caption: "", width: "100%" },
+  chord: {
+    name: "",
+    startFret: 1,
+    strings: ["x", "x", "x", "x", "x", "x"],
+    fingers: [null, null, null, null, null, null],
+  },
+  code: { language: "", code: "" },
+  callout: { title: "", text: "", tone: "info" },
+  quote: { text: "", cite: "" },
+  divider: {},
+  columns: { columns: [[], []] },
+};
+
+/** ===== PAGE ===== */
+export default function TheoryAdmin() {
+  const [tab, setTab] = useState("list"); // list | edit
+  const [items, setItems] = useState([]);
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [flash, setFlash] = useState("");
+  const [error, setError] = useState("");
+
+  // Thông tin người dùng hiện tại (giải từ JWT)
+  const [who, setWho] = useState(() => getCurrentUserFromToken());
+  useEffect(() => {
+    // cho phép F5 vẫn cập nhật who
+    setWho(getCurrentUserFromToken());
+  }, []);
+
+  const EMPTY = useMemo(
+    () => ({
+      theory_id: "",
+      title: "",
+      tags: [],
+      skills: [],
+      level: "beginner",
+      difficulty: 1,
+      summary: "",
+      contentUrl: "",
+      status: "draft",
+      contentBlocks: { blocks: [] },
+    }),
+    []
+  );
+
+  const [item, setItem] = useState(EMPTY);
+
+  /** ========== UTILS: quyền ========== */
+  function canWrite() {
+    const role = who?.role;
+    return role === "admin" || role === "editor";
+  }
+  function requireWriteGuard() {
+    if (canWrite()) return true;
+    setError(
+      "Bạn không có quyền thực hiện hành động này (cần role admin/editor)."
+    );
+    setTimeout(() => setError(""), 3000);
+    return false;
+  }
+  function showApiError(e, fallback = "Thao tác thất bại.") {
+    const msg =
+      e?.data?.message ||
+      e?.data?.error ||
+      e?.message ||
+      `${fallback} (HTTP ${e?.status ?? "?"})`;
+    if (e?.status === 401) {
+      setError("Hết phiên đăng nhập. Vui lòng đăng nhập lại.");
+    } else if (e?.status === 403) {
+      setError(
+        "Bạn không có quyền (403). Hãy đăng nhập tài khoản có quyền admin/editor."
       );
-    } catch (e) {
-      setError(String(e.message || e));
-    } finally {
-      setSaving(false);
-      setTimeout(() => setMessage(null), 2500);
+    } else {
+      setError(msg);
     }
+    setTimeout(() => setError(""), 3500);
   }
 
-  async function loadBySlug() {
+  /* ========== LIST ========== */
+  async function loadList() {
     setLoading(true);
-    setError(null);
-    setMessage(null);
+    setError("");
     try {
-      const slug = loadSlug || article.slug;
-      const res = await fetch(`${API_BASE}/theory/${encodeURIComponent(slug)}`);
-      if (!res.ok) throw new Error(`Không tìm thấy bài với slug đó.`);
-      const json = await res.json();
-      setArticle(json.data);
-      setMessage("Đã nạp bài để chỉnh sửa.");
+      const params = new URLSearchParams({ limit: "100", sort: "-createdAt" });
+      if (q) params.set("q", q);
+      const d = await api.get(`/api/theory?${params.toString()}`, {
+        auth: false, // GET list có thể public
+      });
+      const arr = Array.isArray(d?.items)
+        ? d.items
+        : Array.isArray(d?.data)
+        ? d.data
+        : [];
+      setItems(arr);
     } catch (e) {
-      setError(String(e.message || e));
+      showApiError(e, "Không tải được danh sách.");
     } finally {
       setLoading(false);
-      setTimeout(() => setMessage(null), 2500);
+    }
+  }
+  useEffect(() => {
+    loadList();
+  }, []);
+
+  function newArticle() {
+    setItem(EMPTY);
+    setTab("edit");
+  }
+
+  async function openById(id) {
+    if (!id) return;
+    setLoading(true);
+    setError("");
+    setFlash("");
+    try {
+      const data = await api.get(`/api/theory/${encodeURIComponent(id)}`, {
+        auth: false, // GET detail public
+      });
+      setItem({
+        theory_id: data.theory_id || id,
+        title: data.title || "",
+        tags: data.tags || [],
+        skills: data.skills || [],
+        level: data.level || "beginner",
+        difficulty: data.difficulty ?? 1,
+        summary: data.summary || "",
+        contentUrl: data.contentUrl || "",
+        status: data.status || "draft",
+        contentBlocks: {
+          blocks: normalizeBlocks(
+            data?.contentBlocks?.blocks || data?.blocks || []
+          ),
+        },
+      });
+      setTab("edit");
+      setFlash("Đã nạp bài.");
+      setTimeout(() => setFlash(""), 2000);
+    } catch (e) {
+      showApiError(e, "Không tìm thấy theory.");
+    } finally {
+      setLoading(false);
     }
   }
 
-  useEffect(() => {
-    if (!article.slug && article.title) {
-      setArticle((a) => ({ ...a, slug: slugify(a.title) }));
+  async function removeById(id) {
+    if (!id) return;
+    if (!requireWriteGuard()) return;
+    if (!confirm(`Xoá bài: ${id}?`)) return;
+    try {
+      await api.del(`/api/theory/${encodeURIComponent(id)}`); // DELETE cần auth
+      setFlash("Đã xoá.");
+      setTimeout(() => setFlash(""), 1500);
+      await loadList();
+    } catch (e) {
+      showApiError(e, "Xoá thất bại.");
     }
-  }, [article.title]);
+  }
+
+  /* ========== SAVE ========== */
+  async function createOrUpdate(publish = false) {
+    if (!requireWriteGuard()) return;
+
+    const id = item.theory_id?.trim();
+    if (!id) return alert("Nhập theory_id trước khi lưu.");
+
+    const payload = {
+      theory_id: id,
+      title: item.title || null,
+      tags: item.tags || [],
+      skills: item.skills || [],
+      level: item.level || "beginner",
+      difficulty: Number(item.difficulty) || 1,
+      summary: item.summary || null,
+      contentUrl: item.contentUrl || null,
+      status: publish ? "published" : item.status || "draft",
+      contentBlocks: {
+        blocks: (item.contentBlocks?.blocks || []).map(sanitizeBlock),
+      },
+    };
+
+    setLoading(true);
+    setError("");
+    setFlash("");
+    try {
+      // Check tồn tại (public GET)
+      let exists = true;
+      try {
+        await api.get(`/api/theory/${encodeURIComponent(id)}`, { auth: false });
+      } catch {
+        exists = false;
+      }
+
+      if (exists) {
+        // Ưu tiên PUT, fallback PATCH
+        try {
+          await api.put(`/api/theory/${encodeURIComponent(id)}`, payload);
+        } catch (e) {
+          await api.patch(`/api/theory/${encodeURIComponent(id)}`, payload);
+        }
+        setFlash(publish ? "Đã xuất bản." : "Đã lưu bản chỉnh sửa.");
+      } else {
+        await api.post(`/api/theory`, payload);
+        setFlash("Đã tạo bài mới.");
+      }
+      setTimeout(() => setFlash(""), 2200);
+      await loadList();
+    } catch (e) {
+      showApiError(e, "Lưu thất bại.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* ========== TOC ========== */
+  const toc = useMemo(() => {
+    const blocks = item.contentBlocks?.blocks || [];
+    const items = [];
+    blocks.forEach((b, i) => {
+      if (b.type === "heading") {
+        const lvl = b.props?.level || 2;
+        const id = `h-${lvl}-${i}`;
+        const text = (b.props?.text || "").trim();
+        if (text) items.push({ id, level: lvl, text });
+      }
+    });
+    return items;
+  }, [item.contentBlocks]);
+
+  /* ========== RENDER ========== */
+  const roleBadge =
+    who?.role &&
+    (who.role === "admin" || who.role === "editor" ? (
+      <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 border border-emerald-200">
+        {who.role}
+      </span>
+    ) : (
+      <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700 border border-yellow-200">
+        {who.role || "guest"}
+      </span>
+    ));
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6">
-        <header className="mb-6">
-          {/* Nav tabs */}
-          <nav className="mb-4 flex items-center gap-2">
-            <button
-              onClick={() => setTab("list")}
-              className={`px-3 py-2 rounded-lg border ${
-                tab === "list"
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "hover:bg-gray-50"
-              }`}
-            >
-              Danh sách bài
-            </button>
-            <button
-              onClick={newArticle}
-              className={`px-3 py-2 rounded-lg border ${
-                tab === "edit" && !article?._id && !article?.slug
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "hover:bg-gray-50"
-              }`}
-            >
-              Thêm bài mới
-            </button>
-            {article?.slug && (
-              <button
-                onClick={() => setTab("edit")}
-                className={`px-3 py-2 rounded-lg border ${
-                  tab === "edit" && article?.slug
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "hover:bg-gray-50"
-                }`}
-                title="Chỉnh sửa bài đang mở"
-              >
-                Sửa: {article.slug}
-              </button>
+    <div className="min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* NAV */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            className={cx(
+              "px-3 py-2 rounded-lg border",
+              tab === "list"
+                ? "bg-gray-900 text-white border-gray-900"
+                : "hover:bg-gray-50"
             )}
-          </nav>
+            onClick={() => setTab("list")}
+          >
+            Danh sách
+          </button>
+          <button
+            className={cx(
+              "px-3 py-2 rounded-lg border",
+              tab === "edit"
+                ? "bg-gray-900 text-white border-gray-900"
+                : "hover:bg-gray-50"
+            )}
+            onClick={() => setTab("edit")}
+          >
+            Chỉnh sửa
+          </button>
+          <div className="flex-1" />
+          <div className="text-sm text-gray-600 flex items-center gap-2">
+            <span>Tài khoản:</span>
+            {roleBadge}
+          </div>
+          <button className="px-3 py-2 rounded-lg border" onClick={newArticle}>
+            + Bài mới
+          </button>
+        </div>
 
-          {/* Action bar chỉ hiện ở tab edit */}
-          {tab === "edit" && (
-            <div className="flex items-center justify-between gap-4">
-              <h1 className="text-2xl md:text-3xl font-bold">
-                Admin: Theory Editor
-              </h1>
-              <div className="flex items-center gap-2">
-                <button
-                  className="px-3 py-2 rounded-lg border hover:bg-gray-50"
-                  onClick={() =>
-                    setArticle((a) => ({
-                      ...a,
-                      slug: a.slug || slugify(a.title),
-                    }))
-                  }
-                >
-                  Tạo slug
-                </button>
-                <button
-                  className={`px-3 py-2 rounded-lg border ${
-                    saving && "opacity-60 cursor-not-allowed"
-                  }`}
-                  onClick={() => save(false)}
-                  disabled={saving}
-                >
-                  Lưu nháp
-                </button>
-                <button
-                  className={`px-3 py-2 rounded-lg bg-emerald-600 text-white ${
-                    saving && "opacity-60 cursor-not-allowed"
-                  }`}
-                  onClick={() => save(true)}
-                  disabled={saving}
-                >
-                  Xuất bản
-                </button>
+        {(flash || error) && (
+          <div className="mb-4">
+            {flash && (
+              <div className="px-3 py-2 border rounded-xl bg-emerald-50 text-emerald-800 border-emerald-200">
+                {flash}
               </div>
-            </div>
-          )}
-        </header>
+            )}
+            {error && (
+              <div className="px-3 py-2 border rounded-xl bg-red-50 text-red-800 border-red-200">
+                {error}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* === HIỂN THỊ THEO TAB === */}
         {tab === "list" ? (
-          <ListPanel onCreate={newArticle} onEdit={loadBySlugParam} />
+          <ListPanel
+            items={items}
+            q={q}
+            setQ={setQ}
+            loading={loading}
+            onFilter={loadList}
+            onEdit={openById}
+            onDelete={removeById}
+          />
         ) : (
-          <>
-            {(message || error) && (
-              <div className="mb-4">
-                {message && (
-                  <div className="px-3 py-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    {message}
-                  </div>
-                )}
-                {error && (
-                  <div className="px-3 py-2 rounded-lg bg-red-50 text-red-800 border border-red-200">
-                    {error}
-                  </div>
-                )}
-              </div>
-            )}
+          <EditPanel
+            item={item}
+            setItem={setItem}
+            toc={toc}
+            loading={loading}
+            onSaveDraft={() => createOrUpdate(false)}
+            onPublish={() => createOrUpdate(true)}
+            onLoad={(id) => openById(id)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
-            {/* Meta form */}
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-3">
-                <label className="block">
-                  <span className="text-sm font-medium">Tiêu đề</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border rounded-lg"
-                    value={article.title}
-                    onChange={(e) => update("title", e.target.value)}
-                    placeholder="Ví dụ: Triads 101"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">Slug</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border rounded-lg"
-                    value={article.slug}
-                    onChange={(e) => update("slug", e.target.value)}
-                    placeholder="triads-101-guitar"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium">
-                    Excerpt (tóm tắt ngắn)
+/* ===== LIST ===== */
+function ListPanel({ items, q, setQ, loading, onFilter, onEdit, onDelete }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-end gap-2">
+        <label className="flex-1 block">
+          <span className="text-sm font-medium">Tìm kiếm</span>
+          <input
+            className="mt-1 w-full px-3 py-2 border rounded-lg"
+            placeholder="tiêu đề / theory_id…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onFilter()}
+          />
+        </label>
+        <button
+          className="px-3 py-2 rounded-lg border hover:bg-gray-50"
+          onClick={onFilter}
+          disabled={loading}
+        >
+          {loading ? "Đang tải…" : "Lọc"}
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-[840px] w-full text-sm border rounded-xl">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="p-3 text-left">Tiêu đề</th>
+              <th className="p-3 text-left">theory_id</th>
+              <th className="p-3">Level</th>
+              <th className="p-3">Diff</th>
+              <th className="p-3">Status</th>
+              <th className="p-3 w-56">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it) => (
+              <tr key={it._id || it.theory_id} className="border-t">
+                <td className="p-3">{it.title}</td>
+                <td className="p-3 font-mono text-xs">{it.theory_id}</td>
+                <td className="p-3 text-center">{it.level}</td>
+                <td className="p-3 text-center">{it.difficulty}</td>
+                <td className="p-3 text-center">
+                  <span className="px-2 py-0.5 rounded-full bg-gray-100">
+                    {it.status || "draft"}
                   </span>
-                  <textarea
-                    className="mt-1 w-full px-3 py-2 border rounded-lg"
-                    rows={3}
-                    value={article.excerpt || ""}
-                    onChange={(e) => update("excerpt", e.target.value)}
-                  />
-                </label>
-              </div>
-              <div className="space-y-3">
-                <label className="block">
-                  <span className="text-sm font-medium">Ảnh cover (URL)</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border rounded-lg"
-                    value={article.cover || ""}
-                    onChange={(e) => update("cover", e.target.value)}
-                    placeholder="https://..."
-                  />
-                </label>
-                <TagInput
-                  value={article.tags}
-                  onChange={(v) => update("tags", v)}
-                />
-                <div className="flex items-center gap-3">
-                  <label className="block flex-1">
-                    <span className="text-sm font-medium">Trạng thái</span>
-                    <select
-                      className="mt-1 w-full px-3 py-2 border rounded-lg"
-                      value={article.status}
-                      onChange={(e) => update("status", e.target.value)}
+                </td>
+                <td className="p-3">
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      className="px-2 py-1 border rounded hover:bg-gray-50"
+                      onClick={() => onEdit(it.theory_id)}
                     >
-                      <option value="draft">draft</option>
-                      <option value="published">published</option>
-                      <option value="archived">archived</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-medium">
-                      Tải bài theo slug
-                    </span>
-                    <div className="flex gap-2 mt-1">
-                      <input
-                        className="px-3 py-2 border rounded-lg"
-                        placeholder="slug cần nạp"
-                        value={loadSlug}
-                        onChange={(e) => setLoadSlug(e.target.value)}
-                      />
-                      <button
-                        className="px-3 py-2 rounded-lg border hover:bg-gray-50"
-                        onClick={loadBySlug}
-                        disabled={loading}
-                      >
-                        {loading ? "Đang nạp..." : "Nạp"}
-                      </button>
-                    </div>
-                  </label>
+                      Sửa
+                    </button>
+                    <button
+                      className="px-2 py-1 border rounded text-red-600 hover:bg-red-50"
+                      onClick={() => onDelete(it.theory_id)}
+                    >
+                      Xoá
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {!items.length && (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-gray-500">
+                  Không có bài nào.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/* ===== EDIT ===== */
+function EditPanel({
+  item,
+  setItem,
+  toc,
+  loading,
+  onSaveDraft,
+  onPublish,
+  onLoad,
+}) {
+  const blocks = item.contentBlocks?.blocks || [];
+  const [loadId, setLoadId] = useState("");
+
+  function update(k, v) {
+    setItem((a) => ({ ...a, [k]: v }));
+  }
+  function setBlocks(next) {
+    setItem((a) => ({ ...a, contentBlocks: { blocks: next } }));
+  }
+
+  /* block ops */
+  function addBlock(type) {
+    setBlocks([...blocks, { type, props: clonePreset(type) }]);
+  }
+  function updateBlock(idx, props) {
+    const next = [...blocks];
+    next[idx] = { ...next[idx], props };
+    setBlocks(next);
+  }
+  function moveBlock(from, to) {
+    const arr = [...blocks];
+    if (to < 0 || to >= arr.length) return;
+    const [it] = arr.splice(from, 1);
+    arr.splice(to, 0, it);
+    setBlocks(arr);
+  }
+  function removeBlock(idx) {
+    setBlocks(blocks.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <>
+      {/* META */}
+      <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <label className="block">
+          <span className="text-sm font-medium">theory_id</span>
+          <div className="flex gap-2 mt-1">
+            <input
+              className="flex-1 px-3 py-2 border rounded-lg"
+              value={item.theory_id || ""}
+              onChange={(e) => update("theory_id", e.target.value)}
+              placeholder="ví dụ: t545"
+            />
+            <input
+              className="px-3 py-2 border rounded-lg"
+              placeholder="nạp theo id…"
+              value={loadId}
+              onChange={(e) => setLoadId(e.target.value)}
+            />
+            <button
+              className="px-3 py-2 rounded-lg border hover:bg-gray-50"
+              onClick={() => onLoad(loadId || item.theory_id)}
+              disabled={loading}
+            >
+              {loading ? "Đang nạp…" : "Nạp"}
+            </button>
+          </div>
+        </label>
+        <div className="md:col-span-2 grid grid-cols-2 gap-3">
+          <Field label="Tiêu đề">
+            <input
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={item.title}
+              onChange={(e) => update("title", e.target.value)}
+            />
+          </Field>
+          <Field label="Status">
+            <select
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={item.status || "draft"}
+              onChange={(e) => update("status", e.target.value)}
+            >
+              <option value="draft">draft</option>
+              <option value="published">published</option>
+              <option value="archived">archived</option>
+            </select>
+          </Field>
+          <Field label="Level">
+            <select
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={item.level}
+              onChange={(e) => update("level", e.target.value)}
+            >
+              <option value="beginner">beginner</option>
+              <option value="intermediate">intermediate</option>
+              <option value="advanced">advanced</option>
+            </select>
+          </Field>
+          <Field label="Difficulty (1..5)">
+            <input
+              type="number"
+              min={1}
+              max={5}
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={item.difficulty}
+              onChange={(e) =>
+                update("difficulty", Number(e.target.value) || 1)
+              }
+            />
+          </Field>
+          <Field label="Tags (ngăn cách dấu phẩy)" full>
+            <input
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={(item.tags || []).join(", ")}
+              onChange={(e) => update("tags", splitCSV(e.target.value))}
+            />
+          </Field>
+          <Field label="Skills (ngăn cách dấu phẩy)" full>
+            <input
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={(item.skills || []).join(", ")}
+              onChange={(e) => update("skills", splitCSV(e.target.value))}
+            />
+          </Field>
+          <Field label="Tóm tắt" full>
+            <textarea
+              rows={2}
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={item.summary}
+              onChange={(e) => update("summary", e.target.value)}
+            />
+          </Field>
+          <Field label="Content URL" full>
+            <input
+              className="mt-1 w-full px-3 py-2 border rounded-lg"
+              value={item.contentUrl}
+              onChange={(e) => update("contentUrl", e.target.value)}
+              placeholder="https://..."
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* ACTIONS */}
+      <div className="flex items-center justify-end gap-2 mb-4">
+        <button
+          className="px-3 py-2 rounded-lg border hover:bg-gray-50"
+          onClick={onSaveDraft}
+          disabled={loading}
+        >
+          Lưu nháp
+        </button>
+        <button
+          className="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+          onClick={onPublish}
+          disabled={loading}
+        >
+          Xuất bản
+        </button>
+      </div>
+
+      {/* BUILDER + PREVIEW */}
+      <div className="grid lg:grid-cols-[1fr,380px] gap-6">
+        {/* BUILDER */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Blocks</h2>
+            <AddBlockMenu onPick={(t) => addBlock(t)} />
+          </div>
+
+          <div className="space-y-3">
+            {blocks.map((blk, i) => (
+              <div
+                key={i}
+                className="border rounded-2xl p-4 bg-white shadow-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">
+                    {i + 1}. <span className="uppercase">{blk.type}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="px-2 py-1 text-sm border rounded-lg"
+                      onClick={() => moveBlock(i, i - 1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      className="px-2 py-1 text-sm border rounded-lg"
+                      onClick={() => moveBlock(i, i + 1)}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      className="px-2 py-1 text-sm border rounded-lg text-red-600"
+                      onClick={() => removeBlock(i)}
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <BlockEditor
+                    block={blk}
+                    onChange={(val) => updateBlock(i, val)}
+                  />
                 </div>
               </div>
-            </div>
-
-            {/* Blocks builder */}
-            <section className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold">Blocks</h2>
-                <AddBlockMenu onPick={addBlock} />
+            ))}
+            {!blocks.length && (
+              <div className="p-6 border border-dashed rounded-2xl text-gray-500 text-sm">
+                Chưa có block nào. Nhấn <b>+ Thêm block</b> để bắt đầu.
               </div>
-              <div className="space-y-3">
-                {article.blocks.map((blk, i) => (
-                  <div
-                    key={i}
-                    draggable
-                    onDragStart={() => setDragIndex(i)}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
-                    }}
-                    onDrop={() => {
-                      if (dragIndex === null || dragIndex === i) return;
-                      moveBlock(dragIndex, i);
-                      setDragIndex(null);
-                    }}
-                    className={cx(
-                      "border rounded-2xl p-4 bg-white shadow-sm",
-                      dragIndex === i && "ring-2 ring-emerald-300"
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold">
-                        {i + 1}. <span className="uppercase">{blk.type}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="px-2 py-1 text-sm border rounded-lg"
-                          onClick={() => moveBlock(i, i - 1)}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          className="px-2 py-1 text-sm border rounded-lg"
-                          onClick={() => moveBlock(i, i + 1)}
-                        >
-                          ↓
-                        </button>
-                        <button
-                          className="px-2 py-1 text-sm border rounded-lg text-red-600"
-                          onClick={() => removeBlock(i)}
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <BlockEditor
-                        block={blk}
-                        onChange={(val) => {
-                          setArticle((a) => {
-                            const arr = [...a.blocks];
-                            arr[i] = { ...arr[i], props: val };
-                            return { ...a, blocks: arr };
-                          });
-                        }}
-                      />
-                    </div>
-                  </div>
+            )}
+          </div>
+        </section>
+
+        {/* PREVIEW */}
+        <aside>
+          <div className="border rounded-2xl overflow-hidden">
+            <div className="grid md:grid-cols-[160px,1fr]">
+              <div className="bg-gray-50 p-3">
+                <div className="text-sm font-medium mb-2">Mục lục</div>
+                <ul className="space-y-1">
+                  {toc.map((t) => (
+                    <li key={t.id}>
+                      <span
+                        className="text-sm block"
+                        style={{ paddingLeft: (t.level - 2) * 12 }}
+                      >
+                        {t.text}
+                      </span>
+                    </li>
+                  ))}
+                  {!toc.length && (
+                    <li className="text-xs text-gray-400">
+                      — Chưa có heading —
+                    </li>
+                  )}
+                </ul>
+              </div>
+              <div className="p-4 prose max-w-none">
+                {(item.contentBlocks?.blocks || []).map((b, i) => (
+                  <BlockPreview key={i} block={b} idx={i} />
                 ))}
-                {article.blocks.length === 0 && (
-                  <div className="p-6 border border-dashed rounded-2xl text-gray-500 text-sm">
-                    Chưa có block nào. Nhấn{" "}
-                    <span className="font-semibold">+ Thêm block</span> để bắt
-                    đầu.
-                  </div>
-                )}
               </div>
-            </section>
-          </>
-        )}
-        {/* === /END TAB === */}
+            </div>
+          </div>
+        </aside>
       </div>
-    </div>
+    </>
   );
-
 }
 
-function TagInput({ value, onChange }) {
-  const [input, setInput] = useState("");
-  function add(tag) {
-    const t = String(tag || "").trim();
-    if (!t) return;
-    if (value.includes(t)) return;
-    onChange([...(value || []), t]);
-  }
-  function remove(tag) {
-    onChange((value || []).filter((x) => x !== tag));
-  }
-  function onKeyDown(e) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      add(input);
-      setInput("");
-    }
-    if (e.key === "Backspace" && !input && (value || []).length) {
-      onChange(value.slice(0, -1));
-    }
-  }
+/* ===== Small UI ===== */
+function Field({ label, full, children }) {
   return (
-    <div>
-      <div className="text-sm font-medium">Tags</div>
-      <div className="mt-1 flex flex-wrap gap-2 border rounded-lg p-2">
-        {(value || []).map((t) => (
-          <span
-            key={t}
-            className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs inline-flex items-center gap-1"
-          >
-            #{t}
-            <button
-              className="text-gray-400 hover:text-gray-700"
-              onClick={() => remove(t)}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        <input
-          className="flex-1 min-w-[120px] outline-none"
-          placeholder="nhập tag, Enter để thêm"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-        />
-      </div>
-    </div>
+    <label className={cx("block", full && "col-span-2")}>
+      <div className="text-sm font-medium">{label}</div>
+      {children}
+    </label>
   );
 }
-
 function AddBlockMenu({ onPick }) {
   const [open, setOpen] = useState(false);
   const types = [
@@ -549,10 +733,9 @@ function AddBlockMenu({ onPick }) {
     </div>
   );
 }
-
 function BlockEditor({ block, onChange }) {
-  const t = block.type;
-  const p = block.props || {};
+  const t = block.type,
+    p = block.props || {};
   if (t === "heading") return <HeadingForm value={p} onChange={onChange} />;
   if (t === "paragraph") return <ParagraphForm value={p} onChange={onChange} />;
   if (t === "list") return <ListForm value={p} onChange={onChange} />;
@@ -562,13 +745,12 @@ function BlockEditor({ block, onChange }) {
   if (t === "callout") return <CalloutForm value={p} onChange={onChange} />;
   if (t === "quote") return <QuoteForm value={p} onChange={onChange} />;
   if (t === "divider")
-    return (
-      <div className="text-sm text-gray-500">(Divider – không có cài đặt)</div>
-    );
+    return <div className="text-sm text-gray-500">(Divider)</div>;
   if (t === "columns") return <ColumnsForm value={p} onChange={onChange} />;
   return null;
 }
 
+/* ===== Block Forms ===== */
 function HeadingForm({ value, onChange }) {
   return (
     <div className="grid md:grid-cols-4 gap-3">
@@ -578,7 +760,7 @@ function HeadingForm({ value, onChange }) {
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={value.level ?? 2}
           onChange={(e) =>
-            onChange({ ...value, level: parseInt(e.target.value, 10) })
+            onChange({ ...value, level: parseInt(e.target.value, 10) || 2 })
           }
         >
           <option value={1}>h1</option>
@@ -599,7 +781,6 @@ function HeadingForm({ value, onChange }) {
     </div>
   );
 }
-
 function ParagraphForm({ value, onChange }) {
   return (
     <label className="block">
@@ -613,7 +794,6 @@ function ParagraphForm({ value, onChange }) {
     </label>
   );
 }
-
 function ListForm({ value, onChange }) {
   const [raw, setRaw] = useState(() =>
     (value.items || [])
@@ -655,11 +835,10 @@ function ListForm({ value, onChange }) {
     </div>
   );
 }
-
 function ImageForm({ value, onChange }) {
   return (
     <div className="grid md:grid-cols-2 gap-3">
-      <label className="block">
+      <label className="block md:col-span-2">
         <span className="text-sm">Ảnh (URL)</span>
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
@@ -695,7 +874,6 @@ function ImageForm({ value, onChange }) {
     </div>
   );
 }
-
 function ChordForm({ value, onChange }) {
   const [strings, setStrings] = useState(() => (value.strings || []).join(","));
   const [fingers, setFingers] = useState(() => (value.fingers || []).join(","));
@@ -713,16 +891,14 @@ function ChordForm({ value, onChange }) {
   }, [strings, fingers]);
   return (
     <div className="grid md:grid-cols-3 gap-3">
-      <label className="block">
-        <span className="text-sm">Tên hợp âm</span>
+      <Field label="Tên hợp âm">
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={value.name || ""}
           onChange={(e) => onChange({ ...value, name: e.target.value })}
         />
-      </label>
-      <label className="block">
-        <span className="text-sm">Start fret</span>
+      </Field>
+      <Field label="Start fret">
         <input
           type="number"
           className="mt-1 w-full px-3 py-2 border rounded-lg"
@@ -731,45 +907,41 @@ function ChordForm({ value, onChange }) {
             onChange({ ...value, startFret: parseInt(e.target.value, 10) || 1 })
           }
         />
-      </label>
+      </Field>
       <div />
-      <label className="block md:col-span-2">
-        <span className="text-sm">Strings (6 giá trị, ví dụ: x,3,2,0,1,0)</span>
+      <Field label="Strings (x,3,2,0,1,0)">
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={strings}
           onChange={(e) => setStrings(e.target.value)}
         />
-      </label>
-      <label className="block">
-        <span className="text-sm">Fingers (ví dụ: -,3,2,-,1,-)</span>
+      </Field>
+      <Field label="Fingers (-,3,2,-,1,-)">
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={fingers}
           onChange={(e) => setFingers(e.target.value)}
         />
-      </label>
+      </Field>
     </div>
   );
 }
-
 function CodeForm({ value, onChange }) {
   return (
     <div className="grid md:grid-cols-3 gap-3">
-      <label className="block">
-        <span className="text-sm">Ngôn ngữ</span>
+      <Field label="Ngôn ngữ (ghi chú)">
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={value.language || ""}
           onChange={(e) => onChange({ ...value, language: e.target.value })}
-          placeholder="javascript, typescript, ..."
+          placeholder="javascript, typescript... (preview là plain text)"
         />
-      </label>
+      </Field>
       <label className="block md:col-span-2">
         <span className="text-sm">Code</span>
         <textarea
           className="mt-1 w-full px-3 py-2 border rounded-lg font-mono"
-          rows={4}
+          rows={6}
           value={value.code || ""}
           onChange={(e) => onChange({ ...value, code: e.target.value })}
         />
@@ -777,12 +949,10 @@ function CodeForm({ value, onChange }) {
     </div>
   );
 }
-
 function CalloutForm({ value, onChange }) {
   return (
     <div className="grid md:grid-cols-3 gap-3">
-      <label className="block">
-        <span className="text-sm">Tone</span>
+      <Field label="Tone">
         <select
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={value.tone || "info"}
@@ -794,27 +964,24 @@ function CalloutForm({ value, onChange }) {
             </option>
           ))}
         </select>
-      </label>
-      <label className="block md:col-span-2">
-        <span className="text-sm">Nội dung</span>
+      </Field>
+      <Field label="Nội dung">
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={value.text || ""}
           onChange={(e) => onChange({ ...value, text: e.target.value })}
         />
-      </label>
-      <label className="block md:col-span-3">
-        <span className="text-sm">Tiêu đề (tùy chọn)</span>
+      </Field>
+      <Field label="Tiêu đề (tùy chọn)">
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={value.title || ""}
           onChange={(e) => onChange({ ...value, title: e.target.value })}
         />
-      </label>
+      </Field>
     </div>
   );
 }
-
 function QuoteForm({ value, onChange }) {
   return (
     <div className="grid md:grid-cols-3 gap-3">
@@ -827,40 +994,21 @@ function QuoteForm({ value, onChange }) {
           onChange={(e) => onChange({ ...value, text: e.target.value })}
         />
       </label>
-      <label className="block">
-        <span className="text-sm">Nguồn (cite)</span>
+      <Field label="Nguồn (cite)">
         <input
           className="mt-1 w-full px-3 py-2 border rounded-lg"
           value={value.cite || ""}
           onChange={(e) => onChange({ ...value, cite: e.target.value })}
         />
-      </label>
+      </Field>
     </div>
   );
 }
-
 function ColumnsForm({ value, onChange }) {
   const columns = (value && value.columns) || [[], []];
   function add(colIdx, type) {
-    const base = {
-      heading: { level: 3, text: "" },
-      paragraph: { text: "" },
-      list: { items: [], ordered: false },
-      image: { src: "", alt: "", caption: "", width: "100%" },
-      chord: {
-        name: "",
-        startFret: 1,
-        strings: ["x", "x", "x", "x", "x", "x"],
-        fingers: [null, null, null, null, null, null],
-      },
-      code: { language: "", code: "" },
-      callout: { title: "", text: "", tone: "info" },
-      quote: { text: "", cite: "" },
-      divider: {},
-      columns: { columns: [[], []] },
-    };
-    const next = columns.map((c, idx) =>
-      idx === colIdx ? [...c, { type, props: base[type] }] : c
+    const next = columns.map((c, i) =>
+      i === colIdx ? [...c, { type, props: clonePreset(type) }] : c
     );
     onChange({ ...value, columns: next });
   }
@@ -890,14 +1038,14 @@ function ColumnsForm({ value, onChange }) {
   return (
     <div className="grid md:grid-cols-2 gap-4">
       {columns.map((col, cIdx) => (
-        <div key={cIdx} className="border rounded-xl p-3">
+        <div key={cIdx} className="border rounded-xl p-3 bg-white">
           <div className="flex items-center justify-between mb-2">
             <div className="font-medium">Cột {cIdx + 1}</div>
             <AddBlockMenu onPick={(t) => add(cIdx, t)} />
           </div>
           <div className="space-y-3">
             {col.map((b, i) => (
-              <div key={i} className="border rounded-xl p-3 bg-white">
+              <div key={i} className="border rounded-xl p-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold">
                     {i + 1}. {b.type}
@@ -931,7 +1079,7 @@ function ColumnsForm({ value, onChange }) {
                 </div>
               </div>
             ))}
-            {col.length === 0 && (
+            {!col.length && (
               <div className="text-sm text-gray-500">(Trống)</div>
             )}
           </div>
@@ -940,153 +1088,131 @@ function ColumnsForm({ value, onChange }) {
     </div>
   );
 }
-function ListPanel({ onCreate, onEdit }) {
-  const [items, setItems] = useState([]);
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState("all");
-  const [loading, setLoading] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ limit: "100", sort: "newest" });
-      if (q) params.set("q", q);
-      if (status !== "all") params.set("status", status);
-      const res = await fetch(`${API_BASE}/theory?${params.toString()}`);
-      const json = await res.json();
-      setItems(Array.isArray(json.data) ? json.data : []);
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
+/* ===== Preview Renderer ===== */
+function BlockPreview({ block, idx }) {
+  const { type: t, props: d = {} } = block;
+  if (t === "paragraph") return <p>{d.text}</p>;
+  if (t === "heading") {
+    const Tag = `h${Math.min(6, Math.max(1, d.level || 2))}`;
+    return <Tag id={`h-${d.level || 2}-${idx}`}>{d.text}</Tag>;
   }
-
-  useEffect(() => {
-    load(); /* eslint-disable-next-line */
-  }, []);
-
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex-1 min-w-[220px]">
-          <label className="block text-sm font-medium">Tìm kiếm</label>
-          <input
-            className="mt-1 w-full px-3 py-2 border rounded-lg"
-            placeholder="tiêu đề hoặc slug…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load()}
+  if (t === "list")
+    return d.ordered ? (
+      <ol>
+        {(d.items || []).map((it, i) => (
+          <li key={i}>{it}</li>
+        ))}
+      </ol>
+    ) : (
+      <ul>
+        {(d.items || []).map((it, i) => (
+          <li key={i}>{it}</li>
+        ))}
+      </ul>
+    );
+  if (t === "image")
+    return (
+      <figure>
+        {d.src && (
+          <img
+            src={d.src}
+            alt={d.alt || ""}
+            style={{ width: d.width || "100%" }}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Trạng thái</label>
-          <select
-            className="mt-1 px-3 py-2 border rounded-lg"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="all">Tất cả</option>
-            <option value="draft">draft</option>
-            <option value="published">published</option>
-            <option value="archived">archived</option>
-          </select>
-        </div>
-        <button
-          className="px-3 py-2 rounded-lg border hover:bg-gray-50"
-          onClick={load}
-        >
-          {loading ? "Đang tải…" : "Lọc"}
-        </button>
-        <div className="flex-1" />
-        <button
-          className="px-3 py-2 rounded-lg bg-gray-900 text-white"
-          onClick={onCreate}
-        >
-          + Thêm bài mới
-        </button>
+        )}
+        {(d.caption || d.alt) && (
+          <figcaption className="text-sm opacity-70">
+            {d.caption || d.alt}
+          </figcaption>
+        )}
+      </figure>
+    );
+  if (t === "callout") {
+    const toneClass = {
+      info: "bg-blue-50 text-blue-800 border-blue-200",
+      success: "bg-emerald-50 text-emerald-800 border-emerald-200",
+      warning: "bg-yellow-50 text-yellow-800 border-yellow-200",
+      danger: "bg-red-50 text-red-800 border-red-200",
+    }[d.tone || "info"];
+    return (
+      <div className={cx("px-3 py-2 border rounded-lg", toneClass)}>
+        {d.title && <div className="font-semibold">{d.title}</div>}
+        <div>{d.text}</div>
       </div>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-[720px] w-full text-sm border rounded-xl">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="p-3 text-left">Tiêu đề</th>
-              <th className="p-3 text-left">Slug</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Tags</th>
-              <th className="p-3 w-48">Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={it._id || it.slug} className="border-t">
-                <td className="p-3">{it.title}</td>
-                <td className="p-3 font-mono text-xs">{it.slug}</td>
-                <td className="p-3 text-center">
-                  <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                    {it.status}
-                  </span>
-                </td>
-                <td className="p-3">
-                  {(it.tags || [])
-                    .slice(0, 4)
-                    .map((t) => `#${t}`)
-                    .join(" ")}
-                </td>
-                <td className="p-3">
-                  <div className="flex items-center gap-2 justify-end">
-                    
-                    <button
-                      className="px-2 py-1 border rounded hover:bg-gray-50"
-                      onClick={() => onEdit(it.slug)}
-                    >
-                      Sửa
-                    </button>
-                    <DeleteBtn slug={it.slug} onDone={load} />
-                  </div>
-                </td>
-              </tr>
+    );
+  }
+  if (t === "quote")
+    return (
+      <blockquote>
+        <div>{d.text}</div>
+        {d.cite && <cite className="block opacity-70">— {d.cite}</cite>}
+      </blockquote>
+    );
+  if (t === "code")
+    return (
+      <pre className="rounded-xl bg-gray-900 text-white p-3 overflow-auto">
+        <code>{d.code || ""}</code>
+      </pre>
+    );
+  if (t === "divider") return <hr />;
+  if (t === "columns") {
+    const cols = (d.columns || []).length || 1;
+    return (
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      >
+        {(d.columns || []).map((col, i) => (
+          <div key={i} className="min-w-0">
+            {col.map((b, j) => (
+              <BlockPreview key={j} block={b} idx={`${idx}-${i}-${j}`} />
             ))}
-            {items.length === 0 && !loading && (
-              <tr>
-                <td className="p-6 text-center text-gray-500" colSpan={5}>
-                  Không có bài nào.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+          </div>
+        ))}
       </div>
-    </section>
-  );
+    );
+  }
+  if (t === "chord") {
+    return (
+      <div className="rounded-lg border p-3">
+        <div className="font-semibold mb-1">
+          Chord: {d.name || "(chưa đặt tên)"}
+        </div>
+        <div className="text-xs opacity-75">
+          startFret: {d.startFret ?? 1} • strings:{" "}
+          {(d.strings || []).join(", ")} • fingers:{" "}
+          {(d.fingers || []).map((x) => (x === null ? "-" : x)).join(", ")}
+        </div>
+      </div>
+    );
+  }
+  return null;
 }
 
-function DeleteBtn({ slug, onDone }) {
-  const [busy, setBusy] = useState(false);
-  async function del() {
-    if (!confirm(`Xoá bài: ${slug}?`)) return;
-    setBusy(true);
-    try {
-      const res = await fetch(
-        `${API_BASE}/theory/${encodeURIComponent(slug)}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) throw new Error("Delete failed");
-      onDone?.();
-    } catch (e) {
-      alert("Không xoá được: " + (e.message || e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <button
-      className="px-2 py-1 border rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
-      onClick={del}
-      disabled={busy}
-    >
-      Xoá
-    </button>
+/* ===== Utils ===== */
+function splitCSV(s) {
+  return String(s || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+function clonePreset(type) {
+  const base = BASE_BLOCKS[type];
+  return JSON.parse(JSON.stringify(base || {}));
+}
+function normalizeBlocks(arr) {
+  return (arr || []).map((b) =>
+    b?.props ? b : { ...b, props: b?.data || {} }
   );
+}
+function sanitizeBlock(b) {
+  if (!b || typeof b !== "object") return b;
+  const { type, props } = b;
+  const clean = { type, props: {} };
+  Object.keys(props || {}).forEach((k) => {
+    const v = props[k];
+    if (v !== undefined) clean.props[k] = v;
+  });
+  return clean;
 }

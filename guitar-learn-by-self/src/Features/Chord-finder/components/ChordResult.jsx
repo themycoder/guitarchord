@@ -273,13 +273,13 @@ const ChordResult = () => {
             >
               Xóa nốt
             </button>
-            <button
+            {/* <button
               type="button"
               onClick={stopAll}
               className="h-9 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm"
             >
               Dừng
-            </button>
+            </button> */}
           </div>
         </div>
 

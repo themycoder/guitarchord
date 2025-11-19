@@ -1,11 +1,12 @@
 import React from 'react'
-import Theorys from '../../Features/Theory/components/Theory'
+import TheoryView from '../../Features/Theory-main/components/Theory'
+
 const Theory = () => {
   return (
     <div>
-      <Theorys />
+      <TheoryView autoSameTopic={true} />
     </div>
-  )
+  );
 }
 
 export default Theory
